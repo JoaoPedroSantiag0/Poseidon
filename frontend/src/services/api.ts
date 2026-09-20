@@ -1,5 +1,7 @@
 import type {
   AuditLog,
+  Campaign,
+  CampaignListResponse,
   CanonicalIOC,
   CorrelationTriggerResponse,
   CreateRelationshipRequest,
@@ -7,13 +9,21 @@ import type {
   IOCDetail,
   IOCIngestPayload,
   IOCListResponse,
+  MalwareFamily,
+  MalwareFamilyListResponse,
+  MitreMatrixResponse,
   PathFindingResult,
   RawSourceRecord,
   Relationship,
   RelationshipListResponse,
   Source,
+  TechniqueDetailResponse,
+  ThreatActor,
+  ThreatActorListResponse,
   TokenResponse,
   User,
+  Vulnerability,
+  VulnerabilityListResponse,
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -279,4 +289,156 @@ export const api = {
       body: JSON.stringify(params || {}),
     });
   },
+
+  // --- Phase 5: Threat Actors ---
+  listThreatActors: (params?: {
+    q?: string;
+    primary_motivation?: string;
+    origin_country?: string;
+    is_active?: boolean;
+    page?: number;
+    page_size?: number;
+  }): Promise<ThreatActorListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.set('q', params.q);
+    if (params?.primary_motivation) searchParams.set('primary_motivation', params.primary_motivation);
+    if (params?.origin_country) searchParams.set('origin_country', params.origin_country);
+    if (params?.is_active !== undefined) searchParams.set('is_active', String(params.is_active));
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<ThreatActorListResponse>(`/entities/actors${query}`);
+  },
+
+  getThreatActor: (id: string): Promise<ThreatActor> => {
+    return request<ThreatActor>(`/entities/actors/${id}`);
+  },
+
+  createThreatActor: (payload: Partial<ThreatActor>): Promise<ThreatActor> => {
+    return request<ThreatActor>('/entities/actors', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateThreatActor: (id: string, payload: Partial<ThreatActor>): Promise<ThreatActor> => {
+    return request<ThreatActor>(`/entities/actors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteThreatActor: (id: string): Promise<{ status: string; message: string }> => {
+    return request<{ status: string; message: string }>(`/entities/actors/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- Phase 5: Malware Families ---
+  listMalwareFamilies: (params?: {
+    q?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<MalwareFamilyListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.set('q', params.q);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<MalwareFamilyListResponse>(`/entities/malware${query}`);
+  },
+
+  getMalwareFamily: (id: string): Promise<MalwareFamily> => {
+    return request<MalwareFamily>(`/entities/malware/${id}`);
+  },
+
+  createMalwareFamily: (payload: Partial<MalwareFamily>): Promise<MalwareFamily> => {
+    return request<MalwareFamily>('/entities/malware', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateMalwareFamily: (id: string, payload: Partial<MalwareFamily>): Promise<MalwareFamily> => {
+    return request<MalwareFamily>(`/entities/malware/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteMalwareFamily: (id: string): Promise<{ status: string; message: string }> => {
+    return request<{ status: string; message: string }>(`/entities/malware/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- Phase 5: Campaigns ---
+  listCampaigns: (params?: {
+    q?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<CampaignListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.set('q', params.q);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<CampaignListResponse>(`/entities/campaigns${query}`);
+  },
+
+  getCampaign: (id: string): Promise<Campaign> => {
+    return request<Campaign>(`/entities/campaigns/${id}`);
+  },
+
+  createCampaign: (payload: Partial<Campaign>): Promise<Campaign> => {
+    return request<Campaign>('/entities/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // --- Phase 5: Vulnerabilities ---
+  listVulnerabilities: (params?: {
+    q?: string;
+    is_cisa_kev?: boolean;
+    min_cvss?: number;
+    page?: number;
+    page_size?: number;
+  }): Promise<VulnerabilityListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.set('q', params.q);
+    if (params?.is_cisa_kev !== undefined) searchParams.set('is_cisa_kev', String(params.is_cisa_kev));
+    if (params?.min_cvss !== undefined) searchParams.set('min_cvss', params.min_cvss.toString());
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<VulnerabilityListResponse>(`/entities/vulnerabilities${query}`);
+  },
+
+  getVulnerability: (id: string): Promise<Vulnerability> => {
+    return request<Vulnerability>(`/entities/vulnerabilities/${id}`);
+  },
+
+  createVulnerability: (payload: Partial<Vulnerability>): Promise<Vulnerability> => {
+    return request<Vulnerability>('/entities/vulnerabilities', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // --- Phase 5: MITRE ATT&CK Matrix ---
+  getMitreMatrix: (): Promise<MitreMatrixResponse> => {
+    return request<MitreMatrixResponse>('/mitre/matrix');
+  },
+
+  getTechniqueDetail: (id: string): Promise<TechniqueDetailResponse> => {
+    return request<TechniqueDetailResponse>(`/mitre/techniques/${id}`);
+  },
+
+  seedMitreCatalog: (): Promise<{ status: string; message: string; stats: Record<string, any> }> => {
+    return request<{ status: string; message: string; stats: Record<string, any> }>('/mitre/seed', {
+      method: 'POST',
+    });
+  },
 };
+

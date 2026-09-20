@@ -1,6 +1,14 @@
 """Models package export."""
 from app.db.base import Base
 from app.models.audit import AuditLog
+from app.models.entities import (
+    AttackTactic,
+    AttackTechnique,
+    Campaign,
+    MalwareFamily,
+    ThreatActor,
+    Vulnerability,
+)
 from app.models.enums import (
     TLP,
     AssertionType,
@@ -20,8 +28,11 @@ from app.models.user import Organization, User
 
 __all__ = [
     "AssertionType",
+    "AttackTactic",
+    "AttackTechnique",
     "AuditLog",
     "Base",
+    "Campaign",
     "CanonicalIOC",
     "CanonicalRelationship",
     "compute_relationship_hash",
@@ -30,6 +41,7 @@ __all__ = [
     "IOCLifecycleAudit",
     "IOCStatus",
     "IOCType",
+    "MalwareFamily",
     "NormalizedEvidence",
     "Organization",
     "RawSourceRecord",
@@ -37,7 +49,9 @@ __all__ = [
     "SourceCategory",
     "SourceHealthStatus",
     "SourceRegistry",
+    "ThreatActor",
     "TLP",
     "User",
     "UserRole",
+    "Vulnerability",
 ]

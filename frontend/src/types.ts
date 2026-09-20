@@ -338,3 +338,143 @@ export interface CorrelationTriggerResponse {
   rules_executed: string[];
   details: Record<string, any>[];
 }
+
+// Phase 5: CTI Entities & MITRE ATT&CK
+export interface ThreatActor {
+  id: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  threat_actor_types: string[];
+  primary_motivation: string;
+  secondary_motivations: string[];
+  sophistication: string;
+  resource_level: string;
+  origin_country?: string | null;
+  first_seen: string;
+  last_seen: string;
+  confidence: number;
+  tlp: TLP;
+  is_active: boolean;
+  attributes: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ThreatActorListResponse {
+  items: ThreatActor[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface MalwareFamily {
+  id: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  malware_types: string[];
+  is_family: boolean;
+  target_platforms: string[];
+  capabilities: string[];
+  yara_rules?: string | null;
+  first_seen: string;
+  last_seen: string;
+  confidence: number;
+  tlp: TLP;
+  is_active: boolean;
+  attributes: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MalwareFamilyListResponse {
+  items: MalwareFamily[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  objective: string;
+  first_seen: string;
+  last_seen: string;
+  confidence: number;
+  tlp: TLP;
+  is_active: boolean;
+  attributes: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampaignListResponse {
+  items: Campaign[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface Vulnerability {
+  id: string;
+  cve_id: string;
+  name: string;
+  description: string;
+  cvss_score: number;
+  cvss_vector?: string | null;
+  epss_score?: number | null;
+  is_cisa_kev: boolean;
+  has_public_poc: boolean;
+  affected_products: string[];
+  published_date?: string | null;
+  attributes: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VulnerabilityListResponse {
+  items: Vulnerability[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AttackTechnique {
+  id: string;
+  tactic_id: string;
+  name: string;
+  description: string;
+  is_subtechnique: boolean;
+  parent_technique_id?: string | null;
+  platforms: string[];
+  detection_guidance: string;
+  mitre_url: string;
+  correlated_entities_count: number;
+}
+
+export interface AttackTactic {
+  id: string;
+  name: string;
+  description: string;
+  order_index: number;
+  techniques: AttackTechnique[];
+}
+
+export interface MitreMatrixResponse {
+  tactics: AttackTactic[];
+  total_techniques: number;
+  total_subtechniques: number;
+  coverage_percentage: number;
+}
+
+export interface TechniqueDetailResponse {
+  technique: AttackTechnique;
+  subtechniques: AttackTechnique[];
+  correlated_iocs: Record<string, any>[];
+  correlated_malware: Record<string, any>[];
+  correlated_actors: Record<string, any>[];
+}
+

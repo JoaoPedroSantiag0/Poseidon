@@ -216,3 +216,7 @@ async def init_db() -> None:
                 logger.info("db_init_seeded_source", source_id=src.id, name=src.name)
 
         await session.commit()
+
+        # 4. Seed MITRE ATT&CK Matrix and foundational threat entities
+        from app.services.mitre_catalog import seed_mitre_and_entities
+        await seed_mitre_and_entities(session)

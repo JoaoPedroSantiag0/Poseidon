@@ -9,8 +9,12 @@ import { DashboardView } from './views/DashboardView';
 import { GraphView } from './views/GraphView';
 import { IOCView } from './views/IOCView';
 import { LoginView } from './views/LoginView';
+import { MalwareView } from './views/MalwareView';
+import { MitreView } from './views/MitreView';
 import { PlaceholderView } from './views/PlaceholderView';
 import { SourcesView } from './views/SourcesView';
+import { ThreatActorsView } from './views/ThreatActorsView';
+import { VulnerabilitiesView } from './views/VulnerabilitiesView';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -118,6 +122,59 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'mitre' && (
+            <MitreView
+              onNavigateToActor={() => {
+                setCurrentTab('actors');
+              }}
+              onNavigateToMalware={() => {
+                setCurrentTab('malware');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+            />
+          )}
+
+          {currentTab === 'actors' && (
+            <ThreatActorsView
+              onNavigateToGraph={(actorId) => {
+                setSelectedGraphIOCId(actorId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToMalware={() => {
+                setCurrentTab('malware');
+              }}
+            />
+          )}
+
+          {currentTab === 'malware' && (
+            <MalwareView
+              onNavigateToGraph={(malwareId) => {
+                setSelectedGraphIOCId(malwareId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+            />
+          )}
+
+          {currentTab === 'vulnerabilities' && (
+            <VulnerabilitiesView
+              onNavigateToGraph={(vulnId) => {
+                setSelectedGraphIOCId(vulnId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+            />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -129,6 +186,10 @@ export const App: React.FC = () => {
             'iocs',
             'bulk-ioc',
             'graph',
+            'mitre',
+            'actors',
+            'malware',
+            'vulnerabilities',
             'sources',
             'sources-settings',
             'audit',

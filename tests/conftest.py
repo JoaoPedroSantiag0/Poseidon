@@ -167,6 +167,11 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
             session.add(src)
 
         await session.commit()
+
+        # Seed MITRE ATT&CK Matrix and foundational threat entities
+        from app.services.mitre_catalog import seed_mitre_and_entities
+        await seed_mitre_and_entities(session)
+
         yield session
 
     async with test_engine.begin() as conn:
