@@ -1,0 +1,93 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+id_rsa*
+secrets/
+
+# Operating System Files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+ENV/
+
+# Node.js / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+*.tsbuildinfo
+
+# Go / Collector Agent
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+collector-agent/bin/
+
+# Local databases, storage, and state
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.bbolt
+data/
+opensearch_data/
+pg_data/
+minio_data/
+
+# Logs and runtime artifacts
+logs/
+*.log
+tmp/
+temp/
