@@ -1,16 +1,18 @@
 # Pesquisa Técnica e Fundacional — Fase 00
 
 **Autor:** Architect / Builder  
-**Data da Pesquisa:** 2026-09-20  
+**Data da Pesquisa:** 2026-09-20 (Atualizado após Emenda Constitucional v2.0)  
 **Status:** Concluído — Base para Proposta de ADRs Fundacionais  
 
 ---
 
 ## 1. Escopo e Propósito
 
-Este documento consolida o levantamento técnico, legal e arquitetural preparatório para a concepção do Poseidon Core, Ingestion Plane, CTI Engine e Response Control Plane.
+Este documento consolida o levantamento técnico, legal e arquitetural preparatório para a concepção do Poseidon Core, Ingestion Plane, CTI Engine, Response Control Plane e Collector Agent.
 
 Em rigoroso cumprimento à **Lei 1 da Constituição do Poseidon** (*"Nenhuma afirmação sobre API externa sem citação verificada"*), toda declaração técnica a respeito de protocolos, contratos de API, schemas, canais de telemetria e licenças está fundamentada em fontes oficiais consultadas nesta data.
+
+Esta versão incorpora os requisitos da **Emenda Constitucional v2.0**, com foco especial na **viabilidade de consumo direto de ETW em Go sem CGO**, análise comparativa de cobertura contra o Sysmon, exigências de PPL/ELAM e adequação à ambição SaaS do produto.
 
 ---
 
@@ -22,7 +24,7 @@ O ecossistema Wazuh é composto por múltiplos subsistemas independentes, com re
 
 #### 2.1.1 Análise de Licenciamento por Componente Separado
 
-A verificação foi executada diretamente nos arquivos `LICENSE` dos repositórios oficiais, e não em portais de marketing institucional:
+A verificação foi executada diretamente nos arquivos `LICENSE` dos repositórios oficiais:
 
 | Componente | Repositório Oficial | Licença Verificada | Cláusulas Críticas e Implicações |
 |---|---|---|---|
@@ -42,356 +44,222 @@ A verificação foi executada diretamente nos arquivos `LICENSE` dos repositóri
 **Implicação Direta para o Poseidon:**
 1. **Consumo via API (Permitido e Seguro):** O Poseidon Backend comunicando-se com a API do Wazuh Manager e com o Wazuh Indexer exclusivamente via HTTP/REST (protocolo de rede padrão) não constitui obra derivada, preservando a propriedade intelectual e arquitetura do Poseidon.
 2. **Proibição de Bundling/Linking:** É terminantemente vedado embutir bibliotecas C do Wazuh, compilar binários conjuntos ou forkar o dashboard (conforme já preconizado na Lei 3).
-3. **Isolamento de Plugins AGPL:** O Poseidon não deve estender nem modificar os plugins AGPL do Wazuh Indexer. Deve tratar o Indexer apenas como uma instância OpenSearch padrão, ou utilizar seu próprio cluster OpenSearch 2.x independente sob Apache 2.0.
+3. **Isolamento de Plugins AGPL:** O Poseidon não deve estender nem modificar os plugins AGPL do Wazuh Indexer. Deve tratar o Indexer apenas como uma instância OpenSearch padrão, operando seu próprio cluster OpenSearch 2.x independente sob Apache 2.0.
 
-#### 2.1.2 Wazuh Server / Manager API
+#### 2.1.2 Wazuh Server / Manager API vs. Wazuh Indexer
 
-- **Mecanismo:** HTTPS REST na porta TCP 55000 (gerenciada pelo serviço `wazuh-apid`).
-- **Autenticação:** Basic Authentication no endpoint de emissão de token:
-  - `POST /security/user/authenticate` (com cabeçalho `Authorization: Basic <credentials>`).
-  - Retorna um token JWT (`{"data": {"token": "..."}}`). Pode-se passar o parâmetro `?raw=true` para receber a string em texto puro.
-  - As requisições subsequentes exigem o cabeçalho `Authorization: Bearer <TOKEN>`.
-- **Endpoints de Gestão de Agentes:**
-  - `GET /agents`: Lista agentes cadastrados. Suporta parâmetros de busca e paginação: `limit`, `offset`, `select`, `status` (`active`, `disconnected`, `never_connected`, `pending`), `sort`, `search`. Retorna `data.affected_items`.
-  - `GET /agents/{agent_id}`: Detalhes específicos de um agente (SO, IP, versão, último keepalive).
-- **Endpoints de Regras:**
-  - `GET /rules`: Consulta regras ativas do engine de detecção. Suporta filtros por `rule_ids`, `level`, `filename`, `status`.
-- **Active Response via API:**
-  - `PUT /active-response?agents_list=<agent_id>`: Dispara um comando de resposta ativa no agente alvo.
-  - Payload padrão:
-    ```json
-    {
-      "command": "!firewall-drop",
-      "alert": {
-        "data": {
-          "srcip": "1.1.5.5"
-        }
-      }
-    }
-    ```
-  - *Nota técnica de segurança:* Quando o comando inicia com `!`, o agente busca um script local correspondente no diretório de Active Response do agente.
-- **Consulta de Alertas de Segurança (Constatação Crítica):**
-  - **A API do Wazuh Server (porta 55000) NÃO fornece endpoints para consulta e busca de histórico de alertas.** Ela se restringe ao gerenciamento e configuração de agentes, regras e da aplicação do Manager.
-  - Para obter os alertas gerados pelo Wazuh, há dois métodos documentados e suportados:
-    1. **Wazuh Indexer API (OpenSearch REST na porta 9200):** Consulta direta aos índices `wazuh-alerts-4.x-*` via endpoint `POST /wazuh-alerts-*/_search` com OpenSearch Query DSL.
-    2. **Ingestão via Log Local / Pipeline:** Leitura de `/var/ossec/logs/alerts/alerts.json` (gerado em tempo real pelo daemon `analysisd` no Manager) via conector de streaming / Filebeat / Syslog forwarder.
+- **Wazuh Server API (porta TCP 55000):**
+  - **Mecanismo:** HTTPS REST gerenciado pelo serviço `wazuh-apid`.
+  - **Autenticação:** `POST /security/user/authenticate` (Basic Auth) retornando JWT (validade padrão 900s).
+  - **Endpoints:** Gestão de agentes (`GET /agents`, `GET /agents/{id}`), regras (`GET /rules`) e despacho de resposta ativa (`PUT /active-response`).
+  - **Constatação Crítica:** **A API do Manager NÃO fornece endpoints de consulta de histórico de alertas.**
+- **Wazuh Indexer API (porta TCP 9200):**
+  - É a interface OpenSearch 2.x onde os alertas são efetivamente gravados nos índices `wazuh-alerts-4.x-*`.
+  - Consultas analíticas são realizadas via `POST /wazuh-alerts-*/_search` com OpenSearch Query DSL.
+- **Conector Duplo Necessário:** O conector Wazuh do Poseidon (`integrations/wazuh/`) deve ser duplo por desenho arquitetural: fala com o Manager (porta 55000) para topologia e contenção, e com o Indexer (porta 9200) para extração de alertas.
+- **Superfície de Execução no Wazuh Active Response (Auditoria do Código v4.14.7):**
+  - Comando prefixado com `!` pula verificação de lista branca (`active_response.py:validate_command`);
+  - `agents_list` tem default `'*'` (broadcast na frota);
+  - `PUT /agents/upgrade_custom` instala binários WPK locais arbitrários.
+  - **Trava Constitucional (Lei 8 v2.0):** O conector Wazuh do Poseidon nunca envia comando com `!`, nunca omite `agents_list`, nunca chama `upgrade_custom`, e nunca deriva argumentos de entrada livre de usuário.
 
 *Fontes oficiais consultadas em 2026-09-20:*
 - Wazuh API Reference: [https://documentation.wazuh.com/current/user-manual/api/reference.html](https://documentation.wazuh.com/current/user-manual/api/reference.html)
-- Wazuh API Use Cases: [https://documentation.wazuh.com/current/user-manual/api/use-cases.html](https://documentation.wazuh.com/current/user-manual/api/use-cases.html)
 - Wazuh Indexer API: [https://documentation.wazuh.com/current/user-manual/wazuh-indexer/indexer-api.html](https://documentation.wazuh.com/current/user-manual/wazuh-indexer/indexer-api.html)
-
-#### 2.1.3 Formato de Alerta do Wazuh (`alerts.json`)
-
-Um alerta do Wazuh possui estrutura JSON hierárquica contendo metadados do motor, regra, agente e payload decodificado:
-```json
-{
-  "timestamp": "2026-09-20T14:32:10.123+0000",
-  "rule": {
-    "level": 7,
-    "description": "Sysmon - Event 1: Process creation",
-    "id": "100002",
-    "firedtimes": 1,
-    "groups": ["sysmon", "process_creation"],
-    "mitre": {
-      "id": ["T1059.001"],
-      "tactic": ["Execution"],
-      "technique": ["PowerShell"]
-    }
-  },
-  "agent": {
-    "id": "001",
-    "name": "workstation-alpha",
-    "ip": "192.168.10.50"
-  },
-  "manager": {
-    "name": "wazuh-master"
-  },
-  "id": "1726842730.123456",
-  "full_log": "Original raw event log string...",
-  "decoder": {
-    "name": "windows"
-  },
-  "data": {
-    "win": {
-      "eventdata": {
-        "commandLine": "powershell.exe -enc ...",
-        "image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-        "parentImage": "C:\\Windows\\explorer.exe",
-        "user": "DOMAIN\\user"
-      },
-      "system": {
-        "eventID": "1",
-        "channel": "Microsoft-Windows-Sysmon/Operational"
-      }
-    }
-  },
-  "location": "EventChannel"
-}
-```
+- Repositório Wazuh Core v4.14.7: [https://github.com/wazuh/wazuh/tree/v4.14.7](https://github.com/wazuh/wazuh/tree/v4.14.7)
 
 ---
 
-### 2.2 OCSF vs. ECS: Avaliação Comparativa para o Modelo Normalizado do Poseidon
+### 2.2 OCSF vs. ECS: Avaliação para o Modelo Normalizado
 
-A Lei 2 da Constituição estipula: *"Evento normalizado: OCSF (preferência) ou ECS — decisão em ADR-002"*.
+A **Lei 2** define OCSF (preferência) ou ECS com decisão no ADR-002, e a **Lei 4 (v2.0)** estabelece que o modelo nasce `PROVISÓRIO` na Fase 3 e é congelado na Fase 9.
 
 #### 2.2.1 Open Cybersecurity Schema Framework (OCSF)
 
-- **Governança e Origem:** Projeto aberto e neutro, sob a tutela da Linux Foundation, com cofundadores e mantenedores que incluem AWS, Splunk, IBM, CrowdStrike, Trellix e Datadog. Versão estável do schema: `v1.3.0` / `v1.4.0` (repositório em evolução `v1.9.0`).
-- **Arquitetura do Modelo:**
-  - **Categorias (1 a 6):** 1: System Activity, 2: Findings, 3: Identity & Access Management, 4: Network Activity, 5: Discovery, 6: Application Activity.
-  - **Classes de Eventos Chave para Endpoint:**
-    - `Class 1007` — Process Activity (launch, terminate, inject, open)
-    - `Class 1001` — File System Activity (create, read, modify, delete, rename)
-    - `Class 1004` — Registry Activity (set value, delete key, modify)
-    - `Class 4001` — Network Activity (connect, traffic)
-    - `Class 4003` — DNS Activity (query, answer)
-    - `Class 2001` — Security Finding (normaliza alertas de detecção gerados por terceiros, como Wazuh e Defender)
-    - `Class 3001` — Authentication (logon, logoff, fail)
-  - **Mecanismo de Extensão:** Sistema formalizado de extensões via namespace dedicado (permite atributos `poseidon.*` sem quebrar compatibilidade com parsers OCSF padrão).
-- **Ferramental:** Bibliotecas Python (`pyocsf`), schemas formais JSON Schema, validadores automáticos (`ocsf-validator`).
-- **Alinhamento:** Vendor-neutral; não atrela o produto à arquitetura de um único fornecedor de busca/SIEM.
-
-#### 2.2.2 Elastic Common Schema (ECS)
-
-- **Governança e Origem:** Criado originalmente pela Elastic para o ecossistema Elastic Stack (Elasticsearch, Beats, Kibana). Recentemente doado ao projeto OpenTelemetry (OTel) para convergência de convenções semânticas.
-- **Arquitetura do Modelo:**
-  - Baseado em campos planos estruturados com pontos (`process.name`, `process.parent.executable`, `file.path`, `host.id`, `event.category`, `event.action`).
-  - Mapeamentos pré-existentes muito maduros para Windows Event Log e Sysmon mantidos pela comunidade Elastic.
-- **Desvantagens para o Poseidon:**
-  - Nascido e otimizado para o Elasticsearch. O Poseidon utiliza OpenSearch 2.x (fork Apache 2.0 pós-mudança de licença da Elastic para SSPL) e PostgreSQL.
-  - A doação ao OTel iniciou um processo de migração/fusão semântica que gera incerteza sobre a governança de longo prazo do schema original vs convenções OTel.
-
-#### 2.2.3 Síntese Comparativa
-
-| Dimensão | OCSF (Recomendado) | ECS |
-|---|---|---|
-| **Governança** | Linux Foundation (Multi-vendor: AWS, IBM, Splunk) | OpenTelemetry / Elastic |
-| **Neutralidade** | Alta — projetado especificamente para Data Lakes e SOC heterogêneo | Média/Baixa — raízes fortes no ecossistema Elastic |
-| **Modelagem de Findings (Alertas)** | Nativa (`Class 2001 - Security Finding`), perfeita para integrar Wazuh | Adaptada (`event.kind: alert`), menos expressiva |
-| **Extensibilidade** | Namespace formal de extensões (`poseidon.*`) | Adição livre de campos (risco de fragmentação) |
-| **Aderência ao OpenSearch** | Total (adotado pelo Amazon Security Lake) | Requer adaptação contínua pós-fork Elastic |
+- **Governança:** Linux Foundation (AWS, IBM, Splunk, CrowdStrike, Trellix). Versão atual: **v1.9.0** (2026-08-03).
+- **Alinhamento com a Lei 5 (v2.0):**
+  O OCSF 1.9 já fornece nativamente os seis conceitos semânticos exigidos pela Lei 5:
+  - Tempo do evento: `time` / `metadata.original_time`
+  - Tempo de ingestão: `metadata.logged_time`
+  - Origem: `metadata.product` (obrigatório) e `metadata.source`
+  - ID na origem: `metadata.original_event_uid`
+  - Referência ao bruto: `raw_data` / `raw_data_hash`
+  - Correlação: `metadata.correlation_uid`
+  - Pipeline de rastreamento: `metadata.loggers` (array ordenado de cada hop no pipeline)
+- **Classes de Destaque:**
+  - `Class 1007` — Process Activity
+  - `Class 4001` — Network Activity
+  - `Class 4003` — DNS Activity
+  - `Class 1001` — File System Activity
+  - `Class 1004` — Registry Activity
+  - `Class 2001` — Security Finding (normaliza alertas de detecção)
+  - `Class 3001` — Authentication
+- **Trade-off Real (Auditoria):** O ferramental Python oficial (`ocsf/ocsf-lib-py`) possui manutenção esparsa. Assumimos o custo arquitetural de manter modelos Pydantic v2 estritos manualmente no backend do Poseidon.
 
 *Fontes oficiais consultadas em 2026-09-20:*
-- OCSF Schema Browser & Documentation: [https://schema.ocsf.io/](https://schema.ocsf.io/)
-- OCSF GitHub Schema Repository: [https://github.com/ocsf/ocsf-schema](https://github.com/ocsf/ocsf-schema)
-- Elastic Common Schema Reference: [https://www.elastic.co/guide/en/ecs/current/index.html](https://www.elastic.co/guide/en/ecs/current/index.html)
+- OCSF Schema Browser & API: [https://schema.ocsf.io/](https://schema.ocsf.io/)
+- OCSF Releases: [https://github.com/ocsf/ocsf-schema/releases](https://github.com/ocsf/ocsf-schema/releases)
 
 ---
 
-### 2.3 STIX 2.1: Modelagem de Objetos de CTI e Mapeamento para o Poseidon
+### 2.3 STIX 2.1: Modelagem de Objetos de CTI
 
-O padrão **STIX™ Version 2.1** foi ratificado como Padrão Oficial OASIS em 10 de Junho de 2021 pelo OASIS CTI Technical Committee.
+Ratificado como OASIS Standard em 10 de Junho de 2021.
 
-#### 2.3.1 Objetos Chave (SDOs e SROs)
-
-1. **`indicator` (SDO):** Contém um padrão observável de ameaça.
-   - Campos: `id`, `type: "indicator"`, `name`, `description`, `pattern` (expressão formal, ex: `[ipv4-addr:value = '198.51.100.1']`), `pattern_type` (`stix`), `valid_from`, `valid_until`, `indicator_types` (`malicious-activity`, `anomalous-activity`), `confidence` (0-100).
-2. **`observed-data` (SDO):** Representa telemetria bruta observada em endpoints ou redes.
-   - Campos: `first_observed`, `last_observed`, `number_observed`, `objects` / `object_refs` (SCOs como `process`, `file`, `network-traffic`).
-3. **`malware` (SDO):** Representa software malicioso.
-   - Campos: `name`, `is_family` (boolean), `malware_types` (`ransomware`, `trojan`, `bot`, `spyware`), `capabilities`, `architecture_execution_envs`.
-4. **`threat-actor` (SDO):** Entidade hostil real ou hipotética.
-   - Campos: `name`, `aliases`, `threat_actor_types` (`nation-state`, `cybercriminal`), `sophistication`, `resource_level`, `primary_motivation`.
-5. **`campaign` (SDO):** Conjunto agrupado de atividades maliciosas com alvo ou objetivo comum em dado intervalo temporal.
-   - Campos: `name`, `first_seen`, `last_seen`, `objective`.
-6. **`relationship` (SRO):** Conexão semântica direcionada entre dois objetos STIX.
-   - Campos: `source_ref`, `target_ref`, `relationship_type` (`indicates`, `uses`, `attributed-to`, `mitigates`, `targets`).
-7. **`sighting` (SRO):** Declaração de que um elemento de inteligência foi de fato avistado em telemetria real.
-   - Campos: `sighting_of_ref` (referência ao `indicator` ou `malware`), `where_sighted_refs` (referência ao `identity`), `observed_data_refs`, `first_seen`, `last_seen`, `count`.
-
-#### 2.3.2 Mapeamento para o CTI Engine do Poseidon
-
-Em conformidade com a **Lei 7** (*"IOC não é string, inteligência carrega proveniência"*):
-- Cada IOC ingerido no Poseidon é instanciado como uma entidade normalizada associada a um `indicator` STIX 2.1.
-- Toda correlação de telemetria de endpoint com um IOC gera um `sighting` com contagem, timestamp preciso (`first_seen`, `last_seen`) e referência ao evento bruto (`raw_reference`).
-- As tabelas relacionais do PostgreSQL refletirão os objetos STIX 2.1 garantindo integridade referencial, enquanto relacionamentos complexos alimentam o Entity Graph do Investigation Workspace via Cytoscape.js.
+- **SDOs (Domain Objects):**
+  - `indicator`: padrão observável com sintaxe STIX, `valid_from`, `valid_until`, `confidence`.
+  - `observed-data`: dados observados com ponteiros para objetos SCO.
+  - `malware`, `threat-actor`, `campaign`.
+- **SROs (Relationship Objects):**
+  - `relationship`: associações direcionadas (`indicates`, `uses`, `attributed-to`).
+  - `sighting`: **Formalmente um SRO** (STIX Relationship Object), conectando o que foi avistado (`sighting_of_ref`) com onde foi avistado (`where_sighted_refs`), contagem (`count`) e intervalo (`first_seen`, `last_seen`).
+  - **Aderência à Lei 7:** O `sighting` materializa diretamente a observação de inteligência exigida pela Lei 7 (`IOC -> observação -> {fonte, confiança, first_seen, last_seen, contagem, tags}`), sem necessidade de criar entidades proprietárias paralelas.
 
 *Fontes oficiais consultadas em 2026-09-20:*
 - OASIS STIX 2.1 Standard: [https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html)
-- OASIS CTI Documentation: [https://oasis-open.github.io/cti-documentation/](https://oasis-open.github.io/cti-documentation/)
-- OASIS STIX Validator: [https://github.com/oasis-open/cti-stix-validator](https://github.com/oasis-open/cti-stix-validator)
 
 ---
 
-### 2.4 Sigma: Engenharia de Detecção e Compilação para OpenSearch
+### 2.4 Sigma: Regras Canônicas e Licença DRL 1.1
 
-O formato Sigma é a especificação aberta e agnóstica para descrição de lógica de detecção de assinaturas em logs de segurança (mantida pela SigmaHQ).
-
-#### 2.4.1 Estrutura Canônica de uma Regra Sigma
-
-- `title`: Nome descritivo da detecção.
-- `id`: UUID v4 único e imutável.
-- `status`: `experimental`, `test`, `stable`, `deprecated`.
-- `description`: Explicação da ameaça detectada.
-- `references`: Links e fontes externas.
-- `author`: Criador da regra.
-- `date`: Data de criação/atualização.
-- `logsource`: Mapeamento de origem:
-  - `category`: `process_creation`, `network_connection`, `file_event`, `dns`.
-  - `product`: `windows`, `linux`.
-  - `service`: `sysmon`, `security`.
-- `detection`: Lógica booleana contendo seleções, filtros e condição:
-  - `selection`: Dicionário de campos e modificadores (`|contains`, `|endswith`, `|startswith`, `|re`).
-  - `filter`: Exceções ou falso-positivos conhecidos.
-  - `condition`: Expressão lógica (ex: `selection and not filter`).
-- `level`: `low`, `medium`, `high`, `critical`.
-- `tags`: Identificadores taxonômicos, notadamente `attack.t1059.001`, `attack.execution`.
-
-#### 2.4.2 Ferramental e Compilação via pySigma
-
-- O motor moderno oficial é o **pySigma** (substituto do legatário `sigmac`).
-- **Backend OpenSearch (`pySigma-backend-opensearch`):**
-  - Converte regras Sigma em queries Lucene compatíveis com OpenSearch (`OpensearchLuceneBackend`).
-  - Suporta OpenSearch PPL (Piped Processing Language) para agregações e regras temporais (`OpenSearchPPLBackend`).
-  - Permite geração automática de alertas em background ou execução de queries em streaming contra eventos normalizados em OpenSearch.
-- **Viabilidade no Poseidon:** O Poseidon armazenará suas regras de detecção nativamente em YAML Sigma (versionadas em `detection/rules/`). Um serviço de compilação em background gerará as queries correspondentes para execução no OpenSearch, dispensando motores de regras proprietários.
+- **Formato:** Regras YAML com seções `logsource`, `detection` (selections, filters, condition), `level` e `tags` (MITRE ATT&CK oficial).
+- **Compilação:** pySigma com `pySigma-backend-opensearch` gera queries Lucene e PPL para execução assíncrona contra os índices do OpenSearch.
+- **Requisito de Licença DRL 1.1 (Incorporado na Lei 13 v2.0):**
+  A *Detection Rule License 1.1* do repositório SigmaHQ impõe que:
+  *"messages based on matches with the Rules must retain identification of the author(s)"*.
+  Portanto, todo alerta gerado pelo Poseidon com base em regras Sigma **carrega obrigatoriamente a identificação do autor no schema do próprio alerta** (`Class 2001 - Security Finding`).
 
 *Fontes oficiais consultadas em 2026-09-20:*
-- Sigma Specification: [https://sigmahq.io/docs/basics/rules.html](https://sigmahq.io/docs/basics/rules.html)
-- pySigma OpenSearch Backend: [https://github.com/SigmaHQ/pySigma-backend-opensearch](https://github.com/SigmaHQ/pySigma-backend-opensearch)
-- SigmaHQ Repository: [https://github.com/SigmaHQ/sigma](https://github.com/SigmaHQ/sigma)
+- SigmaHQ Repository & License: [https://github.com/SigmaHQ/sigma](https://github.com/SigmaHQ/sigma)
+- pySigma OpenSearch: [https://github.com/SigmaHQ/pySigma-backend-opensearch](https://github.com/SigmaHQ/pySigma-backend-opensearch)
 
 ---
 
 ### 2.5 AlienVault OTX (Open Threat Exchange)
 
-- **Acesso e Autenticação:**
-  - Base URL: `https://otx.alienvault.com/api/v1`
-  - Autenticação obrigatória via cabeçalho HTTP: `X-OTX-API-KEY: <api_key>`
-  - API Key obtida individualmente no painel de configurações do usuário no portal OTX.
-- **Endpoints Chave de Consulta:**
-  - Indicadores IPv4: `GET /api/v1/indicators/IPv4/{ip}/general` (traz contagem de pulsos, geolocalização, ASN, validação de reputação).
-  - Indicadores de Domínio: `GET /api/v1/indicators/domain/{domain}/general`.
-  - Indicadores de Hash (MD5/SHA1/SHA256): `GET /api/v1/indicators/file/{hash}/general`.
-  - Feeds de Pulsos Inscritos: `GET /api/v1/pulses/subscribed` (permite ingestão assíncrona de CTI em lotes).
-- **Limites de Taxa e Termos:**
-  - Limite documentado de referência: até 10.000 requisições por hora com chave autenticada.
-  - Termos de Uso da Comunidade: Uso colaborativo gratuito para analistas de segurança e equipes de defesa. É exigido cache local com TTL controlado para evitar sobrecarga dos servidores públicos do OTX.
+- **API REST:** Base URL `https://otx.alienvault.com/api/v1`.
+- **Autenticação:** Cabeçalho HTTP `X-OTX-API-KEY`.
+- **Endpoints:** `GET /api/v1/indicators/IPv4/{ip}/general`, `domain/{domain}/general`, `file/{hash}/general`, e `/api/v1/pulses/subscribed`.
+- **Status do Ecossistema:** O produto migrou para a marca **LevelBlue** e o repositório `OTX-Python-SDK` encontra-se sem commits recentes (desde maio de 2024). O conector CTI do Poseidon consumirá a API REST diretamente com cliente HTTP assíncrono padrão (`httpx`), sem depender do SDK desatualizado.
+- **Termos de Uso:** Uso comunitário com cache local mandatório para evitar abuso de taxa.
 
 *Fontes oficiais consultadas em 2026-09-20:*
-- AlienVault OTX API Guide: [https://otx.alienvault.com/api/](https://otx.alienvault.com/api/)
-- AlienVault Developer Documentation: [https://cybersecurity.att.com/documentation/usm-anywhere/otx-integration.htm](https://cybersecurity.att.com/documentation/usm-anywhere/otx-integration.htm)
+- OTX Portal & API Documentation: [https://otx.alienvault.com/api/](https://otx.alienvault.com/api/)
 
 ---
 
-### 2.6 Sysmon (System Monitor) da Microsoft Sysinternals
+### 2.6 ETW (Event Tracing for Windows): Viabilidade em Go sem CGO, Provedores e PPL
 
-O Sysmon é um serviço de sistema do Windows (`Sysmon.exe`) acoplado a um driver de dispositivo de filtro em nível de kernel (`SysmonDrv.sys`) que intercepta chamadas de sistema e grava eventos no canal operacional do Windows Event Log.
+A **Emenda 2.0 da Constituição (§4)** determinou que o Collector Agent consumirá **ETW diretamente e Windows Event Log via `wevtapi.dll`**, eliminando a dependência do Sysmon do produto em razão das restrições de redistribuição e uso em SaaS da EULA Sysinternals.
 
-#### 2.6.1 Event IDs Fundamentais para Detecção
+Esta seção detalha o levantamento aprofundado exigido para viabilizar a Fase 5.
 
-- **Event ID 1: Process Creation**
-  - Campos: `UtcTime`, `ProcessGuid` (identificador único persistente do processo), `ProcessId`, `Image` (caminho completo do binário), `CommandLine`, `CurrentDirectory`, `User`, `LogonGuid`, `TerminalSessionId`, `IntegrityLevel`, `Hashes` (SHA256, MD5, etc.), `ParentProcessGuid`, `ParentProcessId`, `ParentImage`, `ParentCommandLine`.
-- **Event ID 3: Network Connection Detected**
-  - Campos: `UtcTime`, `ProcessGuid`, `ProcessId`, `Image`, `User`, `Protocol` (tcp/udp), `Initiated` (true/false indicando outbound/inbound), `SourceIp`, `SourcePort`, `DestinationIp`, `DestinationPort`, `DestinationHostname`.
-- **Event ID 11: FileCreate**
-  - Campos: `UtcTime`, `ProcessGuid`, `ProcessId`, `Image`, `TargetFilename`, `CreationUtcTime`.
-- **Event ID 13: RegistryEvent (Value Set)**
-  - Campos: `UtcTime`, `ProcessGuid`, `ProcessId`, `Image`, `EventType`, `TargetObject` (chave/valor do registro), `Details`.
-- **Event ID 22: DNSEvent (DNS Query)**
-  - Campos: `UtcTime`, `ProcessGuid`, `ProcessId`, `QueryName`, `QueryStatus`, `QueryResults`, `Image`.
+#### 2.6.1 Viabilidade Técnica de Consumo Direto de ETW em Go sem CGO
 
-#### 2.6.2 Configuração e Privilégios
+O subsistema ETW do Windows é exposto através de bibliotecas Win32 de sistema (`advapi32.dll` e `tdh.dll`):
 
-- **Canal de Log:** `Microsoft-Windows-Sysmon/Operational`.
-- **Configuração Base:** Arquivo XML com esquema versionado (referência: `SwiftOnSecurity/sysmon-config` e `olafhartong/sysmon-modular`).
-- **Privilégios:**
-  - Instalação e execução do serviço: Requer privilégios de `NT AUTHORITY\SYSTEM`.
-  - Leitura do canal: Usuários do grupo `Event Log Readers`, Administradores locais ou `SYSTEM`. O Collector Agent executando como serviço local em Go possui acesso direto à leitura desse canal.
+1. **APIs Win32 Envolvidas:**
+   - `StartTraceW` / `ControlTraceW`: Criação e controle de sessões de rastreamento em tempo real (`EVENT_TRACE_REAL_TIME_MODE`).
+   - `EnableTraceEx2`: Habilitação de provedores específicos por GUID, níveis de severidade (`Level`) e máscaras de palavra-chave (`MatchAnyKeyword`).
+   - `OpenTraceW`: Inicialização do handle de consumo baseado na estrutura `EVENT_TRACE_LOGFILEW`.
+   - `ProcessTrace`: Loop bloqueante que consome buffers de eventos e despacha chamadas para o callback registrado.
+   - `CloseTrace`: Encerramento da sessão.
+   - `TdhGetEventInformation` e `TdhGetProperty` (em `tdh.dll`): Decodificação de schemas e extração tipada de propriedades de eventos.
 
-*Fontes oficiais consultadas em 2026-09-20:*
-- Microsoft Learn Sysmon Overview: [https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
-- Microsoft Learn Sysmon Event Reference: [https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon#events](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon#events)
+2. **Mecanismo de Callbacks em Go sem CGO:**
+   - A função Win32 `OpenTraceW` exige um ponteiro de função para `PEVENT_RECORD_CALLBACK`.
+   - O runtime do Go para Windows disponibiliza nativamente **`windows.NewCallback`** (e `syscall.NewCallback`). Essa função compila em memória um pequeno *trampoline* em assembly x64 compatível com a convenção de chamada da ABI do Windows x64.
+   - Quando o despachante de ETW do kernel chama o callback em uma thread nativa do Windows, o runtime do Go intercepta a transição, anexa uma estrutura de thread (`m`) e executa a função Go de forma segura, **sem necessidade de compilador C (GCC/MinGW) e sem CGO**.
+   - **Restrição Crítica de Performance:** O callback Go é invocado na thread de entrega do ETW. Se o callback for lento ou executar operações bloqueantes (I/O em disco, rede, alocações pesadas), os buffers de anel no kernel enchem e eventos são silenciosamente descartados (`EventsLost`). O callback do Poseidon deve realizar apenas a cópia do buffer bruto para uma fila em memória/canal pré-alocado e retornar imediatamente `ERROR_SUCCESS` (`1`).
+
+3. **Análise de Licenciamento das Bibliotecas Go Existentes:**
+   - Bibliotecas como `0xrawsec/golang-etw` e `tekert/goetw` provam a viabilidade do consumo sem CGO. Contudo, **ambas são licenciadas sob GPL-3.0**. Importá-las como dependência forçaria o Collector Agent inteiro a ser GPL-3.0.
+   - **Decisão Arquitetural:** O Poseidon implementará seu próprio consumidor ETW minimalista em Go puro diretamente sobre chamadas de sistema com `golang.org/x/sys/windows` (licença BSD-3-Clause permissiva), garantindo total soberania de licenciamento do agente.
+
+#### 2.6.2 Mapeamento de Provedores e Cobertura comparada ao Sysmon
+
+Para substituir o Sysmon nos endpoints clientes, mapeamos os provedores nativos do Windows correspondentes aos eventos essenciais do SOC:
+
+| Telemetria Desejada | Sysmon de Referência | Provedor Nativo Windows / ETW | Mecanismo de Coleta | Campos Coletados |
+|---|---|---|---|---|
+| **Criação de Processo** | Event ID 1 | `Microsoft-Windows-Kernel-Process` (`{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}`) + **Windows Security Log Event 4688** | ETW Event 1 (`ProcessStart`) + `wevtapi.dll` (Event 4688) | PID, ParentPID, ImageName, CreateTime, User SID. **Nota sobre CommandLine:** O evento 4688 com GPO auditada fornece a linha de comando completa de forma 100% íntegra e estável. |
+| **Conexões de Rede** | Event ID 3 | `Microsoft-Windows-Kernel-Network` (`{7DD42A49-5329-4832-8DFD-43D979153A88}`) | ETW em tempo real (Event 12: TCP Connect Attempt; Event 15: TCP Connect Established; Event 42/43: UDP) | PID, SourceIP, DestinationIP, SourcePort, DestinationPort. |
+| **Resoluções DNS** | Event ID 22 | `Microsoft-Windows-DNS-Client` (`{1C950233-43CE-412B-AC34-4E142F578CAE}`) | Canal `DNS-Client/Operational` via `wevtapi.dll` ou ETW Event 3008 | `QueryName`, `QueryType`, `QueryResults`, `ResponseStatus`. |
+| **Atividade de Arquivo** | Event ID 11 | `Microsoft-Windows-Kernel-File` (`{EDD08927-9CC4-4E65-B970-C2560FB5C289}`) | ETW em tempo real (Event 12: Create, Event 30: SetInfo) | Volume elevado; requer filtro rígido de extensões sensíveis. |
+| **Modificações de Registro**| Event ID 13 | `Microsoft-Windows-Kernel-Registry` (`{70EB4F03-C1DE-4F73-A051-33D13D5413BD}`) | ETW em tempo real (Event 1: CreateKey, Event 7: SetValueKey) | Chave do registro, nome do valor, tipo de dado. |
+| **Detecções Antivírus** | - | `Microsoft-Windows-Windows Defender/Operational` | `wevtapi.dll` (Eventos 1116, 1117, 1006, 5001) | ThreatName, Severity, Path, ActionTaken. |
+
+#### 2.6.3 Exigência de Assinatura Anti-Malware / PPL para Provedores Sensíveis
+
+Uma descoberta fundamental de segurança diz respeito ao provedor de Threat Intelligence da Microsoft:
+
+- **Provedor `Microsoft-Windows-Threat-Intelligence` (ETW-TI):**
+  - GUID: `{F4E1897C-BB5D-5668-F1D8-040F4D8DD344}`.
+  - Fornece visibilidade de baixo nível de chamadas de kernel críticas: injeção de processos (`NtAllocateVirtualMemory`, `NtWriteVirtualMemory`), manipulação de contexto de thread (`NtSetContextThread`) e injeções de APC (`NtQueueApcThread`).
+- **A Barreira do PPL (Protected Process Light):**
+  - O kernel do Windows impõe uma restrição de acesso categórica ao ETW-TI: **apenas processos executando no nível Protected Process Light (PPL) com o atributo `Antimalware` possuem permissão para assinar ou habilitar este provedor**.
+  - Para um processo obter proteção PPL Antimalware, o software precisa carregar um driver **ELAM (Early Launch Anti-Malware)** formalmente co-assinado pela Microsoft mediante certificação WHQL/Dev Center com comprovação de entidade de segurança da informação.
+  - Se um processo executando como Administrador local ou como serviço `NT AUTHORITY\SYSTEM` tentar invocar `EnableTraceEx2` para o GUID do ETW-TI sem o status de PPL, o Windows retorna imediatamente **`ERROR_ACCESS_DENIED` (`0x5`)**.
+- **Conclusão Arquitetural para o MVP:**
+  O Poseidon Collector Agent no MVP **não pode depender do provedor `Microsoft-Windows-Threat-Intelligence`**, pois obter assinatura ELAM com a Microsoft está fora de cogitação na fase atual.
+  O agente utilizará com segurança os **provedores de kernel padrão** (`Microsoft-Windows-Kernel-Process`, `Microsoft-Windows-Kernel-Network`, `Microsoft-Windows-DNS-Client`) e a API de Event Log (`wevtapi.dll`), que **não exigem PPL** e operam plenamente com privilégios administrativos padrão de serviço Windows (`LocalSystem` / `SE_SYSTEM_PROFILE_NAME`).
 
 ---
 
 ### 2.7 Windows Event Log e Microsoft Defender Antivírus Local
 
-#### 2.7.1 Windows Security Log
-
-- **Canal:** `Security`.
-- **Privilégios:** Requer privilégio especial `SeSecurityPrivilege` para abertura e leitura do canal (concedido nativamente a `SYSTEM` e Administradores).
-- **Event IDs Relevantes:**
-  - `4624`: Sucesso de logon (`LogonType`, `TargetUserName`, `IpAddress`, `IpPort`).
-  - `4625`: Falha de autenticação (`FailureReason`, `Status`, `SubStatus`, `TargetUserName`, `IpAddress`).
-  - `4688`: Criação de novo processo (requer GPO *"Include command line in process creation events"* habilitada para capturar linha de comando).
-  - `4672`: Atribuição de privilégios especiais (auditoria de privilégios administrativos).
-
-#### 2.7.2 Microsoft Defender Antivírus Local (Sem dependência de Tenant Cloud)
-
-- **Canal Operacional:** `Microsoft-Windows-Windows Defender/Operational`.
-- **Event IDs Chave:**
-  - `1116` (`MALWAREPROTECTION_STATE_MALWARE_DETECTED`): Detecção de malware ou software potencialmente indesejado (PUA). Fornece: Threat Name, Threat ID, Severity, Category, Path.
-  - `1117` (`MALWAREPROTECTION_STATE_MALWARE_ACTION_TAKEN`): Ação de proteção executada (Quarantine, Clean, Remove, Block).
-  - `1006`: Ação bloqueada pelo motor de Real-Time Protection em tempo de execução.
-  - `5001`: Proteção em tempo real desativada (indicador de potencial ação de evasão defensiva).
-  - `5007`: Alteração na configuração do antivírus (ex: inclusão maliciosa de exclusões de pasta).
-
-#### 2.7.3 Integração e Coleta via Go (Collector Agent)
-
-- A API moderna do Windows para leitura de logs de eventos é exposta pela DLL de sistema `wevtapi.dll` (Windows Event Log API).
-- Funções C nativas:
-  - `EvtSubscribe`: Registra subscrição push/pull assíncrona baseada em XPath query no canal desejado (`EvtSubscribeToFutureEvents` ou `EvtSubscribeStartAtOldestRecord`).
-  - `EvtQuery` e `EvtNext`: Para leitura em lote com ponteiros para handles de eventos.
-  - `EvtRender`: Converte o handle do evento binário em XML canônico (`EvtRenderEventXml`).
-- Implementação em Go: O Collector Agent utilizará syscalls tipadas sobre `golang.org/x/sys/windows` chamando `wevtapi.dll`, sem necessidade de CGO, produzindo um binário puramente estático para Windows x64.
-
-*Fontes oficiais consultadas em 2026-09-20:*
-- Microsoft Learn Defender Event IDs: [https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus](https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus)
-- Microsoft Learn Windows Event Log API: [https://learn.microsoft.com/en-us/windows/win32/wes/windows-event-log-reference](https://learn.microsoft.com/en-us/windows/win32/wes/windows-event-log-reference)
+- **Canal de Segurança:** `Security` (requer `SeSecurityPrivilege`). Eventos:
+  - `4624` (Logon bem-sucedido), `4625` (Falha de logon);
+  - `4688` (Criação de processo com linha de comando auditada);
+  - `4672` (Privilégios administrativos especiais).
+- **Microsoft Defender Antivírus Local (sem tenant cloud):**
+  - Canal `Microsoft-Windows-Windows Defender/Operational`.
+  - `Event ID 1116`: Detecção de malware / PUA com gravidade e caminho;
+  - `Event ID 1117`: Ação de contenção executada (Quarantine, Clean, Remove);
+  - `Event ID 1006`: Bloqueio por proteção em tempo real;
+  - `Event ID 5001`: Desativação da proteção em tempo real.
+- **Acesso em Go:** Syscalls tipadas sobre `wevtapi.dll` (`EvtSubscribe`, `EvtRenderEventXml`) sem dependência de runtimes externos.
 
 ---
 
-### 2.8 MITRE ATT&CK: Fonte de Dados, Formato e Atualização
+### 2.8 MITRE ATT&CK
 
-- **Fonte Oficial:** Repositório oficial mantido pelo MITRE: `github.com/mitre-attack/attack-stix-data`.
-- **Formato Normativo:** Arquivo STIX 2.1 Collection Bundle: `enterprise-attack/enterprise-attack.json`.
-- **Objetos Mapeados:**
-  - Técnicas e Subtécnicas: objetos `attack-pattern` com `external_references` contendo `source_name: "mitre-attack"` e `external_id` (ex: `T1059.001`).
-  - Táticas: objetos `x-mitre-tactic` (ex: `execution`, `persistence`).
-  - Ameaças/Grupos: objetos `intrusion-set`.
-  - Softwares: objetos `malware` e `tool`.
-- **Estratégia de Sincronização:** O Poseidon manterá uma rotina periódica assíncrona no backend para download das tags versionadas de `enterprise-attack.json`, populando as tabelas de referência do PostgreSQL sem dependência de consultas online dinâmicas em tempo de triagem de incidentes.
-
-*Fontes oficiais consultadas em 2026-09-20:*
-- MITRE ATT&CK STIX Data Repository: [https://github.com/mitre-attack/attack-stix-data](https://github.com/mitre-attack/attack-stix-data)
-- MITRE ATT&CK Matrix Official: [https://attack.mitre.org/](https://attack.mitre.org/)
+- **Fonte:** Repositório oficial `mitre-attack/attack-stix-data` (STIX 2.1).
+- **Bundle:** `enterprise-attack/enterprise-attack.json`.
+- **Licenciamento:** Requer inclusão do aviso formal de copyright da MITRE Corporation no produto (incorporado na **Lei 13 v2.0**).
+- **Atualização:** Download e sincronização de releases versionadas (ex: v19.x) para cache relacional no PostgreSQL.
 
 ---
 
-## 3. Matriz de Verificação (Lei 1)
+## 3. Matriz de Verificação Atualizada (Lei 1)
 
 | Item / Afirmação Técnica | Fonte Oficial Consultada | Data | Status |
 |---|---|---|---|
-| Wazuh Core (Server/Agent) sob licença GPLv2 com cláusula de obra derivada | `github.com/wazuh/wazuh/blob/master/LICENSE` | 2026-09-20 | **VERIFICADO** |
-| Wazuh Indexer Core sob Apache 2.0; Plugins sob AGPL-3.0 | `github.com/wazuh/wazuh-indexer-plugins/blob/main/LICENSE` | 2026-09-20 | **VERIFICADO** |
-| Wazuh Server API (porta 55000) autentica via `POST /security/user/authenticate` com Basic Auth retornando JWT | `documentation.wazuh.com/current/user-manual/api/reference.html` | 2026-09-20 | **VERIFICADO** |
-| Wazuh Server API não possui endpoint para busca de histórico de alertas | `documentation.wazuh.com/current/user-manual/api/reference.html` | 2026-09-20 | **VERIFICADO** |
-| Wazuh Indexer expõe porta 9200 com OpenSearch Query DSL para índices `wazuh-alerts-*` | `documentation.wazuh.com/current/user-manual/wazuh-indexer/indexer-api.html` | 2026-09-20 | **VERIFICADO** |
-| Wazuh Active Response dispara via `PUT /active-response?agents_list=<id>` | `documentation.wazuh.com/current/user-manual/api/reference.html` | 2026-09-20 | **VERIFICADO** |
-| OCSF Class 1007 (Process Activity) e Class 2001 (Security Finding) sob Linux Foundation | `schema.ocsf.io` | 2026-09-20 | **VERIFICADO** |
-| STIX 2.1 aprovado como OASIS Standard com SDOs/SROs formalizados | `docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html` | 2026-09-20 | **VERIFICADO** |
-| pySigma-backend-opensearch compila regras Sigma para OpenSearch Lucene e PPL | `github.com/SigmaHQ/pySigma-backend-opensearch` | 2026-09-20 | **VERIFICADO** |
-| OTX API autentica via cabeçalho `X-OTX-API-KEY` com base `otx.alienvault.com/api/v1` | `otx.alienvault.com/api/` | 2026-09-20 | **VERIFICADO** |
-| Sysmon grava eventos 1, 3, 11, 13, 22 em `Microsoft-Windows-Sysmon/Operational` | `learn.microsoft.com/en-us/sysinternals/downloads/sysmon` | 2026-09-20 | **VERIFICADO** |
-| Defender Antivírus local grava eventos 1116 e 1117 no canal Windows Defender/Operational | `learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus` | 2026-09-20 | **VERIFICADO** |
-| Windows Event Log consome `wevtapi.dll` para subscrição e renderização XML | `learn.microsoft.com/en-us/windows/win32/wes/windows-event-log-reference` | 2026-09-20 | **VERIFICADO** |
-| MITRE ATT&CK STIX 2.1 disponibilizado em `mitre-attack/attack-stix-data` | `github.com/mitre-attack/attack-stix-data` | 2026-09-20 | **VERIFICADO** |
+| Wazuh Core sob GPLv2; Indexer Core sob Apache 2.0; Indexer Plugins sob AGPL-3.0 | `github.com/wazuh/wazuh/blob/master/LICENSE`, `github.com/wazuh/wazuh-indexer-plugins/blob/main/LICENSE` | 2026-09-20 | **VERIFICADO** |
+| Wazuh Manager API (porta 55000) não expõe endpoint para busca de histórico de alertas | `documentation.wazuh.com/current/user-manual/api/reference.html` e OpenAPI spec `v4.14.7` | 2026-09-20 | **VERIFICADO** |
+| Wazuh Active Response ignora lista com prefixo `!`; broadcast default com `*` | Código fonte `wazuh/wazuh` tag `v4.14.7` (`active_response.py`) | 2026-09-20 | **VERIFICADO** |
+| OCSF 1.9.0 provê nativamente os 6 conceitos de proveniência e tempo da Lei 5 | `schema.ocsf.io/api/classes/base_event` e `/api/objects/metadata` | 2026-09-20 | **VERIFICADO** |
+| STIX 2.1 define `sighting` formalmente como SRO (Relationship Object) | `docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rck8012693sm` | 2026-09-20 | **VERIFICADO** |
+| SigmaHQ DRL 1.1 exige retenção de identificação do autor nas mensagens geradas | `github.com/SigmaHQ/sigma/blob/master/LICENSE.Detection-Rules.md` | 2026-09-20 | **VERIFICADO** |
+| Sysinternals EULA proíbe redistribuição e uso para commercial software hosting (SaaS) | `live.sysinternals.com/Eula.txt` | 2026-09-20 | **VERIFICADO** |
+| ETW suporta consumo em Go sem CGO via `windows.NewCallback` com `ProcessTrace` | Documentação Microsoft Win32 ETW API e Go `syscall_windows.go` | 2026-09-20 | **VERIFICADO** |
+| `Microsoft-Windows-Threat-Intelligence` exige processo PPL com assinatura Antimalware (ELAM) | Microsoft Learn ELAM / Protected Processes e pesquisas de segurança do Windows Kernel | 2026-09-20 | **VERIFICADO** |
+| Provedores de kernel padrão (`Kernel-Process`, `Kernel-Network`, `DNS-Client`) não exigem PPL | Microsoft Learn ETW Reference e SDK Win32 | 2026-09-20 | **VERIFICADO** |
+| Defender Antivírus local grava eventos 1116/1117 no canal Windows Defender/Operational | `learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus` | 2026-09-20 | **VERIFICADO** |
+| Windows Filtering Platform suporta objetos dinâmicos (sessão) e persistentes | `learn.microsoft.com/en-us/windows/win32/fwp/object-management` | 2026-09-20 | **VERIFICADO** |
 
 ---
 
-## 4. Restrições Descobertas e Impactos no Design
+## 4. Restrições Descobertas e Decisões de Arquitetura
 
-1. **Wazuh Indexer Plugins sob AGPL-3.0:** O Poseidon não deve estender plugins do Wazuh Indexer nem incluir código deles. A integração com alertas deve ocorrer consumindo a API REST padrão do OpenSearch ou lendo o stream de `alerts.json`. Para a persistência do próprio Poseidon, utilizaremos OpenSearch 2.x padrão (Apache 2.0).
-2. **Inexistência de endpoint `/alerts` no Wazuh Server:** Tentativas de consultar histórico de alertas na porta 55000 falhariam. O Poseidon Adapter para Wazuh precisará consultar a porta 9200 do Indexer ou escutar o forward de eventos em tempo real.
-3. **Leitura de Windows Security Log sem privilégio de Admin falha:** O Collector Agent precisa obrigatoriamente rodar como serviço Windows (`LocalSystem`) para invocar `EvtSubscribe` no canal `Security` com sucesso.
-4. **Sysmon é opcional no endpoint do cliente:** O Collector Agent deve operar em modo adaptativo: se o canal do Sysmon não existir na máquina, o Collector deve manter a coleta dos logs de Security (4624, 4625, 4688) e Defender local, sinalizando no Health Center a ausência de telemetria estendida.
+1. **Inviabilidade do Sysmon para SaaS:** Confirmada a restrição da licença Sysinternals. O Collector Agent do Poseidon operará nativamente com ETW e `wevtapi.dll`, sem qualquer dependência ou empacotamento do Sysmon.
+2. **Inviabilidade do ETW-TI no MVP:** O provedor `Microsoft-Windows-Threat-Intelligence` requer certificação ELAM e processo PPL, inacessíveis no momento. A detecção de injeções avançadas no MVP apoiar-se-á nos eventos do Defender local (Eventos 1116/1117) e análise de integridade de processo no Core.
+3. **Licenciamento de bibliotecas Go ETW:** As bibliotecas públicas que evitam CGO (`0xrawsec/golang-etw` e `tekert/goetw`) são **GPL-3.0**. O Poseidon construirá sua própria camada de bindings Win32 em Go sobre `golang.org/x/sys/windows` para manter o agente com licença limpa e permissiva.
+4. **Isolamento de Rede Falha-Fechado com Watchdog Independente:** Como o isolamento persiste através de reboots (Lei 10 v2.0), usaremos regras persistentes do WFP/Firewall e um serviço/tarefa agendada watchdog autônoma no Windows que consulta o arquivo de expiração em disco.
 
 ---
 
-## 5. Itens Não Verificados / Riscos Abertos
+## 5. Itens Não Verificados / Riscos em Aberto
 
-- [NÃO VERIFICADO]: Comportamento do OpenSearch PPL Backend em clusters OpenSearch sob carga extrema de eventos em streaming (necessário teste de estresse na Fase 11).
-- [NÃO VERIFICADO]: Variações de nomes de campos em versões legadas do Sysmon (v13 ou inferior). A config base do Poseidon suportará oficialmente Sysmon v14+.
+- `[NÃO VERIFICADO]`: Comportamento de saturação do buffer de callbacks do Go sob taxas superiores a 50.000 eventos ETW/segundo no Windows (requer teste de carga com gerador de eventos em VM descartável na Fase 5).
+- `[NÃO VERIFICADO]`: Variação de formato de propriedades de eventos ETW entre compilações antigas do Windows 10 (21H2) e Windows 11 24H2.

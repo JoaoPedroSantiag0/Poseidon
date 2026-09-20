@@ -5,7 +5,14 @@
 > Este documento tem precedência sobre qualquer instrução de papel
 > (`01-BUILDER.md`, `02-AUDITOR.md`) e sobre qualquer preferência do modelo.
 >
-> Versão: 1.0 · Status: vigente
+> Versão: **2.0** · Status: vigente · Emendada em 2026-09-20
+>
+> **Emenda 2.0** — motivada pela auditoria da Fase 0 (`docs/gates/FASE-00/03-AUDIT-REPORT.md`,
+> 4 BLOCKER) e por duas decisões do humano: o Poseidon tem ambição de **SaaS**, e o
+> isolamento é **falha-fechado**. Mudaram: Lei 4 (decidir ≠ congelar), Lei 5 (requisitos
+> semânticos, não nomes de campo), Lei 8 (alcance estendido a caminhos de terceiros),
+> Lei 10 (reescrita), Lei 13 (nova), §4 (ETW no lugar de Sysmon), §7 (roadmap) e §11
+> (multi-tenancy não construída, mas não impedida).
 
 ---
 
@@ -80,26 +87,41 @@ Nenhum arquivo do `wazuh-dashboard` entra neste repositório.
 
 ### Lei 4 — Nenhum modelo de evento nasce de uma fonte só
 
-O modelo de evento normalizado (ADR-002) só pode ser congelado depois de ter sido
-exercitado contra **no mínimo duas fontes heterogêneas** — na prática: Sysmon/Windows
-Event Log via Collector Agent, e alertas do Wazuh. Um normalizador validado contra uma
-única fonte é, por construção, o formato daquela fonte com outro nome.
+Um normalizador validado contra uma única fonte é, por construção, o formato daquela fonte
+com outro nome. Por isso **decidir o padrão e congelar o modelo são atos separados**:
+
+- **Decidir** (ADR-002, Fase 3): escolher OCSF ou ECS. Pode ser feito com pesquisa.
+  O modelo resultante nasce marcado `PROVISÓRIO` e todas as migrações das Fases 4–8
+  permanecem reversíveis por causa disso.
+- **Congelar** (Fase 9): só depois de o modelo ter sido exercitado contra **no mínimo duas
+  fontes heterogêneas** — telemetria de endpoint via Collector Agent, e alertas do Wazuh.
+  O congelamento é artefato explícito, com ADR próprio (`Supersedes: ADR-002`).
+
+Para antecipar a segunda fonte sem antecipar a integração: um **corpus gravado de alertas
+reais do Wazuh** (subir um container uma vez e capturar `alerts.json`) exercita o
+normalizador na Fase 3 sem exigir Wazuh integrado. Isso é obrigatório, não opcional —
+sem ele, a Fase 3 modela contra zero fontes reais.
 
 ### Lei 5 — `event_time` nunca é `ingestion_time`
 
-Todo evento carrega, obrigatoriamente e de forma distinta:
+**Esta lei enuncia requisitos semânticos, não nomes de campo.** Os nomes concretos são os
+do padrão adotado no ADR-002 — inventá-los aqui violaria a Lei 2. Todo evento carrega,
+obrigatoriamente e de forma **distinta entre si**, estes seis conceitos:
 
-```
-event_time         quando aconteceu no endpoint/fonte
-ingestion_time     quando o Poseidon recebeu
-source             origem
-source_event_id    id no sistema de origem
-raw_reference      ponteiro para o evento bruto preservado
-correlation_id     agrupamento lógico
-```
+| Conceito | Significado |
+|---|---|
+| tempo do evento | quando aconteceu no endpoint/fonte |
+| tempo de ingestão | quando o Poseidon recebeu |
+| origem | qual fonte produziu |
+| identificador na origem | id do evento no sistema de origem |
+| referência ao bruto | ponteiro para o evento original preservado |
+| correlação | agrupamento lógico |
 
-Colapsar esses campos destrói a capacidade forense da plataforma. O evento bruto
-original é preservado e nunca é sobrescrito pela versão normalizada.
+Conceito sem equivalente no padrão adotado nasce sob `poseidon.*`, conforme a Lei 2.
+
+O núcleo inegociável da lei é: **o tempo do evento nunca é o tempo de ingestão**, e **o
+evento bruto original é preservado e nunca sobrescrito pela versão normalizada**. Colapsar
+os dois primeiros ou descartar o terceiro destrói a capacidade forense da plataforma.
 
 ### Lei 6 — Case Timeline e Audit Log são coisas diferentes
 
@@ -123,11 +145,33 @@ IOC → observação → { fonte, confiança, first_seen, last_seen, contagem, t
 É proibido persistir ou exibir "este IOC é malicioso" sem indicar **quem** afirmou isso,
 **quando** e com **que confiança**. Fonte externa nunca vira verdade absoluta do sistema.
 
-### Lei 8 — O Collector Agent não executa comandos arbitrários
+### Lei 8 — Nenhum caminho de execução arbitrária, próprio ou de terceiro
+
+**Esta lei vale para todo caminho de execução que o Poseidon comanda** — o agente que
+escrevemos e o agente que comandamos através da API de outro fornecedor. A proibição é da
+plataforma, não de um componente.
 
 Não existe, em nenhuma hipótese, um endpoint do tipo `POST /agent/execute {command}`.
 O agente expõe um **conjunto fechado de capacidades nomeadas**, implementadas em código,
 verificadas por assinatura. Tudo fora dessa lista é rejeitado pelo próprio agente.
+
+**Para caminhos de terceiros, o Poseidon se autoimpõe as restrições que o fornecedor não
+impõe.** No caso do Wazuh Active Response, verificado no código-fonte da tag v4.14.7:
+comando prefixado com `!` pula a verificação contra a lista de comandos permitidos;
+`agents_list` tem default `'*'` e atinge a frota inteira; argumentos entram sem escape no
+caminho de agentes modernos; e `PUT /agents/upgrade_custom` instala binário WPK arbitrário.
+Portanto o conector Wazuh do Poseidon:
+
+```
+❌ nunca envia command com prefixo '!'
+❌ nunca omite agents_list
+❌ nunca chama upgrade_custom
+❌ nunca deriva arguments de entrada do usuário
+✅ usa conta com RBAC restrito no próprio Wazuh
+```
+
+Registre-se como fato arquitetural: **a credencial da API do Wazuh equivale a execução de
+código na frota Wazuh.** Ela recebe o mesmo nível de proteção de uma chave de assinatura.
 
 Capacidades autorizadas do MVP:
 
@@ -173,16 +217,34 @@ PENDING → AUTHORIZED → DISPATCHED → ACKNOWLEDGED → EXECUTING → SUCCESS
 ### Lei 10 — Isolamento tem failsafe, ou não existe
 
 Isolar um endpoint é a operação mais perigosa da plataforma: um erro transforma a máquina
-em algo que só se recupera fisicamente. Requisitos obrigatórios e simultâneos:
+em algo que só se recupera fisicamente.
+
+**Decisão registrada (2026-09-20, humano):** o isolamento é **falha-fechado** — sobrevive
+ao reboot da máquina e à morte do agente. A contenção vale mais que a conveniência de
+recuperação. A consequência direta é que **o failsafe não pode morar no agente**, porque
+é exatamente o agente que pode ter morrido.
+
+Requisitos obrigatórios e simultâneos:
 
 1. **Snapshot** do estado de firewall antes de aplicar, com restauração exata.
-2. **Dead-man's-switch**: se o agente perder contato com o control plane por N minutos
-   (padrão: 30, configurável, com mínimo e máximo travados em código), ele **restaura
-   automaticamente** a conectividade e registra o evento.
-3. **Exceção garantida** para o canal de saída do Poseidon, DNS e infraestrutura de
-   gerenciamento — isolamento seletivo é o padrão; isolamento total é opção explícita.
-4. **Teste obrigatório em VM descartável** antes de qualquer execução em máquina real.
+2. **Somente isolamento seletivo no MVP.** Exceção garantida para o canal de saída do
+   Poseidon, DNS e infraestrutura de gerenciamento. **Isolamento total está fora do MVP** —
+   com transporte exclusivamente outbound, um host totalmente isolado é um host que o
+   Poseidon não alcança mais, e prometer contenção total sem dizer isso é mentir para o
+   analista no pior momento possível.
+3. **Expiração absoluta persistida em disco.** Toda ação de isolamento grava um instante de
+   expiração. Passado esse instante sem reautorização, o isolamento cai.
+4. **Watchdog independente do serviço do agente** — mecanismo do sistema operacional, não
+   um timer dentro do processo — responsável por honrar a expiração do item 3 mesmo que o
+   agente esteja morto, travado ou desinstalado.
+5. **Caminho de recuperação fora de banda**, documentado e **testado**, capaz de remover o
+   isolamento de uma máquina cujo agente não responde mais. Nenhuma capacidade de
+   isolamento vai para produção antes deste caminho existir e ter sido exercitado.
+6. **Teste obrigatório em VM descartável** antes de qualquer execução em máquina real.
    Nenhum PR de isolamento é aprovado sem evidência desse teste.
+
+A Lei 10 distingue **"perdeu contato porque algo quebrou"** de **"perdeu contato porque foi
+isolado a mando"**. Tratar os dois como a mesma coisa é o defeito que esta redação corrige.
 
 ### Lei 11 — O Collector não coleta segredos
 
@@ -202,6 +264,27 @@ Um SOC que perdeu telemetria parece tranquilo justamente porque parou de enxerga
 O Health Center não é funcionalidade de conveniência: é requisito de correção. Toda fonte,
 conector, fila, worker e agente reporta saúde, e ausência de dados é tratada como sinal,
 não como silêncio.
+
+### Lei 13 — Atribuição e proteção de dados são requisitos de schema, não rodapé
+
+O Poseidon consome obras de terceiros cujas licenças impõem obrigações **que viajam com o
+dado**, não com o repositório:
+
+- **Regras do SigmaHQ (Detection Rule License 1.1):** se as regras forem usadas sobre
+  dados, *"messages based on matches with the Rules must retain identification of the
+  author(s)"*. Todo alerta gerado por uma regra do SigmaHQ **carrega o autor da regra no
+  próprio alerta**. Atribuir no repositório não cumpre a licença.
+- **MITRE ATT&CK:** uso comercial permitido mediante **reprodução do aviso de copyright e
+  da licença** em qualquer cópia. O aviso existe no produto, não só no README.
+- **Feeds de CTI de terceiros:** armazenar e reexibir IOCs alheios dentro de um produto
+  SaaS é questão de licenciamento, não de engenharia. Nenhum feed entra em produção sem
+  que seus termos tenham sido lidos e registrados em ADR.
+
+E, porque o Poseidon processa telemetria de endpoints de pessoas físicas em nome de
+terceiros: **a LGPD se aplica, e o Poseidon é operador de dados pessoais.** Isso não é item
+de conformidade para a Fase 15. É requisito de desenho — finalidade declarada, minimização,
+retenção com prazo, segregação por tenant e capacidade de eliminação a pedido nascem com o
+modelo de dados, não depois dele.
 
 ---
 
@@ -265,6 +348,15 @@ TanStack Query/Router/Table · Cytoscape.js (entity graph) · Vitest + Playwrigh
 
 **Collector Agent** — **Go 1.22+**, binário estático único, sem runtime externo.
 Serviço Windows nativo. Buffer local em bbolt/SQLite com teto de tamanho.
+
+**Fonte de telemetria: ETW direto, não Sysmon.** A EULA do Sysinternals proíbe
+redistribuição e veda *"use the software for commercial software hosting services"*. Como o
+Poseidon tem ambição de SaaS (decisão registrada, 2026-09-20), depender de Sysmon é
+inviável no produto. O Collector consome **ETW** (`Microsoft-Windows-Kernel-Process`,
+`Microsoft-Windows-DNS-Client` e equivalentes) e o **Windows Event Log** via `wevtapi.dll`
+(`EvtSubscribe`/`EvtRender` sobre `golang.org/x/sys/windows`, sem CGO). O Sysmon pode ser
+usado como **referência de laboratório** para comparar cobertura, nunca como dependência
+do produto, e o instalador do Poseidon jamais o empacota.
 Transporte **HTTPS + mTLS, exclusivamente outbound**, com *polling* para ações pendentes
 (não usamos conexão de entrada: o agente precisa funcionar atrás de NAT, proxy e,
 principalmente, durante o próprio isolamento).
@@ -346,16 +438,16 @@ produção.** Nenhuma fase começa com a anterior em `FAIL` ou sem veredito.
 ## 7. Roadmap
 
 ```
-Fase 0   Research + ADRs fundacionais (licença Wazuh, OCSF/ECS, STIX, Sigma)
+Fase 0   Research + ADRs fundacionais (licenças, OCSF/ECS, STIX, Sigma, viabilidade ETW)
 Fase 1   Foundation + Design System
-Fase 2   Identity / RBAC / Audit Log
-Fase 3   Event Model            ← modelado contra Sysmon E Wazuh (Lei 4)
+Fase 2   Identity / RBAC / Audit Log        ← modelo de tenant presente, operação single-tenant
+Fase 3   Event Model PROVISÓRIO  ← decide o padrão; exercita contra corpus gravado do Wazuh (Lei 4)
 Fase 4   Ingestion Framework
-Fase 5   Collector Agent v0.1   (Sysmon + Security Log + Defender AV local)
+Fase 5   Collector Agent v0.1   (ETW + Security Log + Defender AV local)
 Fase 6   CTI Engine + OTX
 Fase 7   Cases + Timeline
 Fase 8   Response Control Plane + isolamento com failsafe
-Fase 9   Wazuh como segunda fonte  ← valida que o Event Model não é moldado a ninguém
+Fase 9   Wazuh como 2ª fonte real  ← CONGELA o Event Model (ADR próprio, Supersedes ADR-002)
 Fase 10  Investigation Workspace + Entity Graph
 Fase 11  Detection Engineering (Sigma) + Event Replay Lab
 Fase 12  Evidence Locker + chain of custody
@@ -375,8 +467,8 @@ permissões de aplicativo e licença. Portanto:
 - Na Fase 8, construímos o **contrato** `EDRConnector` (`isolate`, `restore`, `hunt`,
   `get_device`), implementado contra o formato documentado da API e testado com respostas
   gravadas/mockadas, entregue **desabilitado**.
-- Telemetria de endpoint no laboratório vem de **Sysmon + Windows Security Log + log
-  operacional do Defender Antivírus local** — tudo gratuito e sem tenant.
+- Telemetria de endpoint vem de **ETW + Windows Security Log + log operacional do Defender
+  Antivírus local** — tudo gratuito, sem tenant e sem amarra de licença (ver §4).
 - Capacidade de isolamento é **inteiramente nossa** (Windows Firewall/WFP no Collector),
   com Wazuh Active Response como segundo caminho de resposta.
 
@@ -431,9 +523,20 @@ Inventar para não parar é falha grave. Parar e perguntar é comportamento corr
 
 Para proteger o projeto de morrer de ambição, está explicitamente **fora** do MVP:
 
-NDR · UEBA · multi-tenant · IA tomando ação autônoma · resposta automática sem aprovação
-humana · agentes Linux/macOS · correlação avançada com machine learning · marketplace de
-integrações · chat entre IAs como funcionalidade do produto.
+NDR · UEBA · IA tomando ação autônoma · resposta automática sem aprovação humana ·
+isolamento total · agentes Linux/macOS · correlação avançada com machine learning ·
+marketplace de integrações · chat entre IAs como funcionalidade do produto.
 
 Proposta de qualquer um desses itens antes da Fase 13 deve ser recusada pelo Auditor como
 desvio de escopo, ainda que tecnicamente elegante.
+
+### Multi-tenancy: não construída, mas não impedida
+
+O Poseidon tem ambição de SaaS (decisão registrada, 2026-09-20). Multi-tenancy **não é
+construída no MVP** — a operação é single-tenant — mas o modelo de dados **não pode
+inviabilizá-la**. Concretamente: entidades que pertencem a um cliente carregam
+identificação de tenant desde a Fase 2, ainda que exista um único tenant em operação.
+
+Retroajustar tenant em um schema populado é projeto de migração; nascer com o campo é uma
+coluna. Esta é a única concessão ao futuro que a constituição autoriza — e ela existe
+porque o custo de não fazê-la é assimétrico, não porque multi-tenancy esteja no escopo.

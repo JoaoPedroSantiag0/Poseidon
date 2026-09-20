@@ -65,7 +65,7 @@ Percorra todas. Em cada uma, o que segue é o mínimo.
 
 ### 4.1 Conformidade com a constituição
 
-Verifique, uma a uma, as doze leis. Especificamente:
+Verifique, uma a uma, as treze leis. Especificamente:
 
 - Existe afirmação sobre API externa sem citação verificada? (Lei 1)
 - Foi inventado schema onde OCSF/STIX/Sigma/ATT&CK resolveriam? (Lei 2)
@@ -80,6 +80,10 @@ Verifique, uma a uma, as doze leis. Especificamente:
 - Failsafe de isolamento existe, é testável, e foi testado em VM? (Lei 10)
 - O Collector coleta algo que se aproxime de credencial? Linha de comando é redigida? (Lei 11)
 - Ausência de telemetria gera sinal, ou passa despercebida? (Lei 12)
+- Alerta gerado por regra do SigmaHQ carrega o autor da regra? Aviso de copyright do
+  ATT&CK existe no produto? Feed de CTI entrou sem ADR de termos de uso? (Lei 13)
+- Dado pessoal tem finalidade, prazo de retenção, segregação por tenant e caminho de
+  eliminação? (Lei 13)
 
 ### 4.2 Veracidade técnica — sua função mais importante
 
@@ -249,9 +253,10 @@ Procure ativamente por cada uma. Elas são as que realmente machucam o Poseidon.
 1. **Endpoint de execução genérico** no agente, disfarçado de "capacidade flexível", de
    "plugin", de "script configurável" ou de passagem de argumentos não validados para uma
    capacidade legítima.
-2. **Isolamento sem restauração garantida** — sem snapshot, sem dead-man's-switch, ou com
-   o timer implementado do lado do servidor (que é justamente quem o endpoint isolado
-   pode não conseguir alcançar).
+2. **Isolamento sem caminho de saída garantido** — sem snapshot, sem expiração absoluta
+   persistida, com o watchdog dentro do próprio processo do agente (que é justamente quem
+   pode ter morrido), ou sem caminho de recuperação fora de banda testado. Sob a decisão
+   falha-fechado da Lei 10, isto deixa a máquina irrecuperável remotamente.
 3. **Exceção de firewall pelo destino errado** — regra que libera por IP fixo do servidor
    quando ele está atrás de DNS dinâmico, ou que libera por porta em vez de por processo.
 4. **Event Model moldado ao Wazuh** — campos que só existem porque o alerta do Wazuh tem

@@ -209,7 +209,9 @@ A Fase 0 é de pesquisa e decisão. **Não escreva código de aplicação ainda.
      dashboard e indexer podem não compartilhar a mesma licença; verifique o arquivo
      LICENSE de cada repositório, não o site institucional. Implicações para uso via API
      vs. redistribuição/bundling. Depois:
-     API do Manager (auth, endpoints de alertas/agentes/regras), Wazuh Indexer,
+     **API do Manager** (auth, agentes, regras, resposta ativa — ela **não** serve
+     alertas) e **Wazuh Indexer** (alertas, índices, autenticação própria) como dois
+     sistemas distintos; o conector Wazuh é duplo por necessidade. Também:
      Active Response, formato de alerta
    - **OCSF vs. ECS**: modelo, maturidade, cobertura para eventos de endpoint,
      ferramental disponível, qual serve melhor ao Poseidon
@@ -217,7 +219,12 @@ A Fase 0 é de pesquisa e decisão. **Não escreva código de aplicação ainda.
      campaign, relationship, sighting), e como mapeiam para nosso CTI
    - **Sigma**: formato, backends, viabilidade como formato canônico de detecção
    - **OTX**: autenticação, endpoints, limites de taxa, termos de uso
-   - **Sysmon**: eventos 1, 3, 11, 13, 22; canal de log; config base; o que exige privilégio
+   - **ETW**: viabilidade de consumo direto em Go sem CGO; provedores equivalentes a
+     criação de processo, conexão de rede e consulta DNS; exigência de assinatura
+     anti-malware/PPL para provedores sensíveis; cobertura comparada ao Sysmon.
+     **Este item é bloqueante** — a Fase 5 inteira depende da resposta
+   - **Sysmon**: só como referência de cobertura para comparar com ETW. Não é dependência
+     do produto (ver §4 da constituição); não pesquisar como se fosse
    - **Windows Event Log e Defender Antivírus local**: canais, IDs relevantes, acesso via Go
    - **MITRE ATT&CK**: fonte dos dados, formato, atualização
 
