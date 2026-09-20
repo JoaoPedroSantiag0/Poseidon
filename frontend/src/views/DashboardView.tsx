@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ShieldAlert,
   Radio,
@@ -8,7 +8,10 @@ import {
   Search,
   Activity,
   ArrowUpRight,
+  ChevronRight,
+  X,
 } from 'lucide-react';
+import { IntelligenceCard } from '../components/ui';
 import type { Source } from '../types';
 
 interface DashboardViewProps {
@@ -17,6 +20,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ sources, onNavigate }) => {
+  const [selectedIOC, setSelectedIOC] = useState<string | null>(null);
   const connectedCount = sources.filter((s) => s.health_status === 'CONNECTED' && s.is_enabled).length;
 
   const mockHighRiskIOCs = [
@@ -182,11 +186,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ sources, onNavigat
               </thead>
               <tbody className="divide-y divide-poseidon-border/60">
                 {mockHighRiskIOCs.map((item, index) => (
-                  <tr key={index} className="hover:bg-poseidon-elevated/40 transition-colors">
+                  <tr
+                    key={index}
+                    onClick={() => setSelectedIOC(item.ioc)}
+                    className="hover:bg-poseidon-elevated/60 transition-colors cursor-pointer group"
+                  >
                     <td className="px-5 py-3 font-mono font-medium text-slate-200">
-                      <span className="cursor-pointer hover:text-poseidon-cyan hover:underline truncate max-w-xs block">
-                        {item.ioc}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="group-hover:text-poseidon-cyan group-hover:underline truncate max-w-xs block font-bold">
+                          {item.ioc}
+                        </span>
+                        <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-poseidon-cyan transition-colors" />
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-poseidon-elevated border border-poseidon-border text-slate-300">
@@ -269,6 +280,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ sources, onNavigat
           </div>
         </div>
       </div>
+
+      {/* Inspected IOC Intelligence Card Modal */}
+      {selectedIOC && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-4xl w-full my-8 relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setSelectedIOC(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-poseidon-elevated border border-poseidon-border text-slate-400 hover:text-white flex items-center justify-center shadow-lg hover:border-poseidon-cyan z-10 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <IntelligenceCard
+              iocValue={selectedIOC}
+              iocType={
+                selectedIOC.includes('.') && !selectedIOC.includes('/') && !selectedIOC.match(/[a-z]/i)
+                  ? 'IPv4 Address'
+                  : selectedIOC.length === 64
+                  ? 'File Hash (SHA256)'
+                  : 'Internet Domain'
+              }
+              riskScore={87}
+              confidence="HIGH"
+              status="ACTIVE"
+              tlp="TLP:AMBER+STRICT"
+              firstSeen="14 Aug 2026 09:12 UTC"
+              lastSeen="20 Sep 2026 14:05 UTC"
+              sightingsCount={48}
+              sourcesCount={5}
+              malwareFamily="LummaStealer"
+              threatActor="UNC4393"
+              onInvestigate={() => {
+                setSelectedIOC(null);
+                onNavigate('investigations');
+              }}
+              onExport={(ioc) => {
+                alert(`Exporting STIX 2.1 JSON bundle for ${ioc}...`);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

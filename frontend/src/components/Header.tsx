@@ -3,9 +3,10 @@ import { Search, Shield, Bell } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
+  onOpenCommandPalette?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentTab }) => {
+export const Header: React.FC<HeaderProps> = ({ currentTab, onOpenCommandPalette }) => {
   return (
     <header className="h-16 border-b border-poseidon-border bg-poseidon-surface/80 backdrop-blur px-6 flex items-center justify-between">
       {/* Title & Context */}
@@ -21,18 +22,22 @@ export const Header: React.FC<HeaderProps> = ({ currentTab }) => {
 
       {/* Universal Search Bar */}
       <div className="flex-1 max-w-xl mx-8">
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div
+          onClick={onOpenCommandPalette}
+          className="relative cursor-pointer group"
+        >
+          <Search className="w-4 h-4 text-slate-400 group-hover:text-poseidon-cyan absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors" />
           <input
             type="text"
-            placeholder="Universal Search (IP, Domain, Hash SHA256, URL, CVE, Threat Actor, Malware)..."
-            className="w-full bg-poseidon-base border border-poseidon-border rounded-lg pl-10 pr-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-poseidon-cyan focus:ring-1 focus:ring-poseidon-cyan transition-all font-mono"
+            readOnly
+            placeholder="Universal Search & Command Enclave (Ctrl + K)..."
+            className="w-full bg-poseidon-base border border-poseidon-border group-hover:border-poseidon-cyan/40 rounded-lg pl-10 pr-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 cursor-pointer focus:outline-none transition-all font-mono select-none"
           />
           <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-poseidon-elevated border border-poseidon-border text-[10px] font-mono text-slate-400">
+            <kbd className="px-1.5 py-0.5 rounded bg-poseidon-elevated border border-poseidon-border text-[10px] font-mono text-slate-400 group-hover:text-poseidon-cyan transition-colors">
               CTRL
             </kbd>
-            <kbd className="px-1.5 py-0.5 rounded bg-poseidon-elevated border border-poseidon-border text-[10px] font-mono text-slate-400">
+            <kbd className="px-1.5 py-0.5 rounded bg-poseidon-elevated border border-poseidon-border text-[10px] font-mono text-slate-400 group-hover:text-poseidon-cyan transition-colors">
               K
             </kbd>
           </div>
