@@ -558,4 +558,87 @@ export interface AddNoteRequest {
   epistemic_classification?: EpistemicClassification;
 }
 
+// Phase 7: Bulk Enrichment Workbench & Ingestion Orchestrator Types
+export interface ExtractedItem {
+  raw_value: string;
+  normalized_value: string;
+  ioc_type: IOCType;
+  is_valid: boolean;
+  validation_error?: string | null;
+  occurrences: number;
+  already_exists: boolean;
+  existing_ioc_id?: string | null;
+  existing_risk_score?: number | null;
+  existing_confidence_score?: number | null;
+  existing_status?: string | null;
+}
+
+export interface ParseTextResponse {
+  total_extracted: number;
+  valid_count: number;
+  invalid_count: number;
+  existing_count: number;
+  new_count: number;
+  by_type: Record<string, number>;
+  items: ExtractedItem[];
+}
+
+export interface ParseTextRequest {
+  text: string;
+  auto_defang?: boolean;
+  target_types?: IOCType[];
+}
+
+export interface BulkEnrichItemInput {
+  raw_value: string;
+  normalized_value: string;
+  ioc_type: IOCType;
+  tags?: string[];
+}
+
+export interface BulkEnrichRequest {
+  items: BulkEnrichItemInput[];
+  connector_ids?: string[];
+  tlp?: TLP;
+  epistemic_classification?: EpistemicClassification;
+  tags?: string[];
+  create_investigation?: boolean;
+  investigation_title?: string;
+}
+
+export interface BulkEnrichResultItem {
+  ioc_id: string;
+  raw_value: string;
+  normalized_value: string;
+  ioc_type: IOCType;
+  risk_score: number;
+  confidence_score: number;
+  status: string;
+  sources_queried: number;
+  sources_found: number;
+  connector_findings: Record<string, any>;
+  tags: string[];
+}
+
+export interface BulkEnrichResponse {
+  total_processed: number;
+  created_count: number;
+  updated_count: number;
+  enriched_count: number;
+  results: BulkEnrichResultItem[];
+  investigation_id?: string | null;
+  case_number?: string | null;
+}
+
+export interface ConnectorCapability {
+  id: string;
+  name: string;
+  is_enabled: boolean;
+  supported_types: IOCType[];
+  rate_limit_per_minute: number;
+  requires_api_key: boolean;
+  has_api_key: boolean;
+}
+
+
 

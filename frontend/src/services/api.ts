@@ -2,10 +2,13 @@ import type {
   AddEntityRequest,
   AddNoteRequest,
   AuditLog,
+  BulkEnrichRequest,
+  BulkEnrichResponse,
   Campaign,
   CampaignListResponse,
   CanonicalIOC,
   CaseNote,
+  ConnectorCapability,
   CorrelationTriggerResponse,
   CreateCaseRequest,
   CreateRelationshipRequest,
@@ -18,6 +21,8 @@ import type {
   MalwareFamily,
   MalwareFamilyListResponse,
   MitreMatrixResponse,
+  ParseTextRequest,
+  ParseTextResponse,
   PathFindingResult,
   RawSourceRecord,
   Relationship,
@@ -516,6 +521,25 @@ export const api = {
 
   exportInvestigationMISP: (caseId: string): Promise<Record<string, any>> => {
     return request<Record<string, any>>(`/investigations/${caseId}/export/misp`);
+  },
+
+  // Phase 7: Bulk Enrichment Workbench
+  parseText: (payload: ParseTextRequest): Promise<ParseTextResponse> => {
+    return request<ParseTextResponse>('/enrichment/parse', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  bulkEnrich: (payload: BulkEnrichRequest): Promise<BulkEnrichResponse> => {
+    return request<BulkEnrichResponse>('/enrichment/bulk-enrich', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getEnrichmentConnectors: (): Promise<ConnectorCapability[]> => {
+    return request<ConnectorCapability[]>('/enrichment/connectors');
   },
 };
 

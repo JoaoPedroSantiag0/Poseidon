@@ -6,6 +6,7 @@ import { api, clearAuthToken, getAuthToken } from './services/api';
 import type { Source, User } from './types';
 import { AuditView } from './views/AuditView';
 import { DashboardView } from './views/DashboardView';
+import { EnrichmentView } from './views/EnrichmentView';
 import { GraphView } from './views/GraphView';
 import { InvestigationsView } from './views/InvestigationsView';
 import { IOCView } from './views/IOCView';
@@ -189,6 +190,22 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'enrichment' && (
+            <EnrichmentView
+              onNavigateToGraph={(seedId) => {
+                setSelectedGraphIOCId(seedId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+              onNavigateToInvestigation={() => {
+                setCurrentTab('investigations');
+              }}
+            />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -205,6 +222,7 @@ export const App: React.FC = () => {
             'malware',
             'vulnerabilities',
             'investigations',
+            'enrichment',
             'sources',
             'sources-settings',
             'audit',
