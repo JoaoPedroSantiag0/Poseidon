@@ -27,10 +27,13 @@ import type {
   RawSourceRecord,
   Relationship,
   RelationshipListResponse,
+  ResurgenceInsight,
   Source,
   TechniqueDetailResponse,
   ThreatActor,
   ThreatActorListResponse,
+  TimelineEventType,
+  TimelineQueryResponse,
   TokenResponse,
   UpdateCaseRequest,
   User,
@@ -540,6 +543,47 @@ export const api = {
 
   getEnrichmentConnectors: (): Promise<ConnectorCapability[]> => {
     return request<ConnectorCapability[]>('/enrichment/connectors');
+  },
+
+  // Phase 8: Temporal Timeline Intelligence
+  getTimeline: (params: {
+    from_date?: string;
+    to_date?: string;
+    entity_type?: string;
+    entity_id?: string;
+    event_types?: TimelineEventType[];
+    min_risk?: number;
+    page?: number;
+    page_size?: number;
+  } = {}): Promise<TimelineQueryResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params.from_date) searchParams.append('from_date', params.from_date);
+    if (params.to_date) searchParams.append('to_date', params.to_date);
+    if (params.entity_type) searchParams.append('entity_type', params.entity_type);
+    if (params.entity_id) searchParams.append('entity_id', params.entity_id);
+    if (params.min_risk !== undefined) searchParams.append('min_risk', params.min_risk.toString());
+    if (params.page) searchParams.append('page', params.page.toString());
+    if (params.page_size) searchParams.append('page_size', params.page_size.toString());
+    if (params.event_types) {
+      params.event_types.forEach((t) => searchParams.append('event_types', t));
+    }
+    const qs = searchParams.toString();
+    return request<TimelineQueryResponse>(`/timeline${qs ? `?${qs}` : ''}`);
+  },
+
+  getResurgences: (dormancyDays = 30): Promise<ResurgenceInsight[]> => {
+    return request<ResurgenceInsight[]>(`/timeline/resurgences?dormancy_days=${dormancyDays}`);
+  },
+
+  getEntityTimeline: (
+    entityType: string,
+    entityId: string,
+    page = 1,
+    pageSize = 50
+  ): Promise<TimelineQueryResponse> => {
+    return request<TimelineQueryResponse>(
+      `/timeline/entity/${entityType}/${entityId}?page=${page}&page_size=${pageSize}`
+    );
   },
 };
 

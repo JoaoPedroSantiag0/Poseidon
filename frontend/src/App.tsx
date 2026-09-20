@@ -16,6 +16,7 @@ import { MitreView } from './views/MitreView';
 import { PlaceholderView } from './views/PlaceholderView';
 import { SourcesView } from './views/SourcesView';
 import { ThreatActorsView } from './views/ThreatActorsView';
+import { TimelineView } from './views/TimelineView';
 import { VulnerabilitiesView } from './views/VulnerabilitiesView';
 
 export const App: React.FC = () => {
@@ -206,6 +207,22 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'timeline' && (
+            <TimelineView
+              onNavigateToGraph={(seedId) => {
+                setSelectedGraphIOCId(seedId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+              onNavigateToInvestigation={() => {
+                setCurrentTab('investigations');
+              }}
+            />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -223,6 +240,7 @@ export const App: React.FC = () => {
             'vulnerabilities',
             'investigations',
             'enrichment',
+            'timeline',
             'sources',
             'sources-settings',
             'audit',

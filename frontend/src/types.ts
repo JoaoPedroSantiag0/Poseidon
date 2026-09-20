@@ -640,5 +640,64 @@ export interface ConnectorCapability {
   has_api_key: boolean;
 }
 
+// Phase 8: Temporal Timeline Intelligence Types
+export type TimelineEventType =
+  | 'FIRST_SIGHTING'
+  | 'SIGHTING'
+  | 'LIFECYCLE_TRANSITION'
+  | 'EVIDENCE_OBSERVED'
+  | 'RELATIONSHIP_CREATED'
+  | 'CAMPAIGN_ACTIVITY'
+  | 'CASE_NOTE'
+  | 'RESURGENCE';
+
+export interface TimelineEvent {
+  id: string;
+  event_type: TimelineEventType;
+  timestamp: string;
+  entity_type: string;
+  entity_id: string;
+  entity_label: string;
+  title: string;
+  description: string;
+  source_name?: string | null;
+  epistemic_classification: EpistemicClassification;
+  tlp: TLP;
+  risk_score?: number | null;
+  metadata: Record<string, any>;
+}
+
+export interface TimelineBucket {
+  bucket_date: string;
+  bucket_label: string;
+  total_events: number;
+  high_risk_events: number;
+}
+
+export interface ResurgenceInsight {
+  ioc_id: string;
+  ioc_value: string;
+  ioc_type: IOCType;
+  first_seen: string;
+  last_seen: string;
+  dormancy_gap_days: number;
+  sightings_count: number;
+  risk_score: number;
+  sources: string[];
+  detected_at: string;
+}
+
+export interface TimelineQueryResponse {
+  events: TimelineEvent[];
+  total_events: number;
+  page: number;
+  page_size: number;
+  histogram: TimelineBucket[];
+  resurgences_count: number;
+  from_date?: string | null;
+  to_date?: string | null;
+}
+
+
 
 
