@@ -92,3 +92,129 @@ export interface AuditLog {
   previous_state?: Record<string, any>;
   new_state?: Record<string, any>;
 }
+
+// IOC Core Types
+export type IOCType =
+  | 'ipv4'
+  | 'ipv6'
+  | 'domain'
+  | 'fqdn'
+  | 'url'
+  | 'hash_md5'
+  | 'hash_sha1'
+  | 'hash_sha256'
+  | 'hash_sha512'
+  | 'email'
+  | 'asn'
+  | 'cve'
+  | 'x509_cert_sha256'
+  | 'ja3'
+  | 'ja4'
+  | 'user_agent'
+  | 'mutex'
+  | 'registry_key'
+  | 'crypto_wallet'
+  | 'software_package';
+
+export type IOCStatus =
+  | 'NEW'
+  | 'OBSERVED'
+  | 'ENRICHED'
+  | 'CORRELATED'
+  | 'VALIDATED'
+  | 'ACTIVE'
+  | 'STALE'
+  | 'EXPIRED'
+  | 'REVOKED';
+
+export type EpistemicClassification =
+  | 'FACT'
+  | 'OBSERVATION'
+  | 'CORRELATION'
+  | 'ASSESSMENT'
+  | 'HYPOTHESIS'
+  | 'UNKNOWN';
+
+export type TLP = 'CLEAR' | 'GREEN' | 'AMBER' | 'AMBER+STRICT' | 'RED';
+
+export interface RawSourceRecord {
+  id: string;
+  ioc_id: string;
+  source_id?: string;
+  source_name: string;
+  raw_payload: Record<string, any>;
+  payload_sha256: string;
+  fetched_at: string;
+  source_confidence?: number;
+  source_severity?: string;
+  external_reference_id?: string;
+  created_at: string;
+}
+
+export interface NormalizedEvidence {
+  id: string;
+  ioc_id: string;
+  source_id?: string;
+  source_name: string;
+  key: string;
+  value: any;
+  epistemic_classification: EpistemicClassification;
+  observed_at: string;
+}
+
+export interface IOCLifecycleAudit {
+  id: string;
+  from_status: IOCStatus;
+  to_status: IOCStatus;
+  reason?: string;
+  changed_by_user_id?: string;
+  created_at: string;
+}
+
+export interface CanonicalIOC {
+  id: string;
+  ioc_type: IOCType;
+  raw_value: string;
+  normalized_value: string;
+  canonical_hash: string;
+  epistemic_classification: EpistemicClassification;
+  tlp: TLP;
+  status: IOCStatus;
+  risk_score: number;
+  confidence_score: number;
+  first_seen: string;
+  last_seen: string;
+  sightings_count: number;
+  tags: string[];
+  attributes: Record<string, any>;
+  is_false_positive: boolean;
+  false_positive_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IOCDetail extends CanonicalIOC {
+  raw_records: RawSourceRecord[];
+  evidences: NormalizedEvidence[];
+  lifecycle_audits: IOCLifecycleAudit[];
+}
+
+export interface IOCListResponse {
+  items: CanonicalIOC[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface IOCIngestPayload {
+  value: string;
+  ioc_type?: IOCType;
+  source_name?: string;
+  tags?: string[];
+  attributes?: Record<string, any>;
+  epistemic_classification?: EpistemicClassification;
+  tlp?: TLP;
+  initial_risk_score?: number;
+  initial_confidence_score?: number;
+}

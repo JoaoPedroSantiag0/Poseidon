@@ -45,35 +45,38 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
         # Seed test admin
         admin = User(
+            id="admin-user-id",
             email="admin@poseidon.cti",
             hashed_password=get_password_hash("PoseidonAdmin2026!#"),
             full_name="Poseidon Admin",
             role=UserRole.ADMIN,
             organization_id=org.id,
             is_active=True,
-            is_superuser=True
+            is_superuser=True,
         )
         session.add(admin)
 
         # Seed test analyst
         analyst = User(
+            id="analyst-user-id",
             email="analyst@poseidon.cti",
             hashed_password=get_password_hash("AnalystPassword123!"),
             full_name="CTI Analyst Jane",
             role=UserRole.CTI_ANALYST,
             organization_id=org.id,
-            is_active=True
+            is_active=True,
         )
         session.add(analyst)
 
         # Seed test viewer
         viewer = User(
+            id="viewer-user-id",
             email="viewer@poseidon.cti",
             hashed_password=get_password_hash("ViewerPassword123!"),
             full_name="Viewer Bob",
             role=UserRole.VIEWER,
             organization_id=org.id,
-            is_active=True
+            is_active=True,
         )
         session.add(viewer)
 

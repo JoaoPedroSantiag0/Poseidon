@@ -1,4 +1,14 @@
-import type { AuditLog, Source, TokenResponse, User } from '../types';
+import type {
+  AuditLog,
+  CanonicalIOC,
+  IOCDetail,
+  IOCIngestPayload,
+  IOCListResponse,
+  RawSourceRecord,
+  Source,
+  TokenResponse,
+  User,
+} from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -97,5 +107,69 @@ export const api = {
   // Audit Logs
   listAuditLogs: (limit = 50): Promise<AuditLog[]> => {
     return request<AuditLog[]>(`/audit?limit=${limit}`);
+  },
+
+  // IOC Core Intelligence
+  listIOCs: (params: {
+    page?: number;
+    page_size?: number;
+    q?: string;
+    ioc_type?: string;
+    status?: string;
+    min_risk?: number;
+    max_risk?: number;
+  } = {}): Promise<IOCListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.append('page', params.page.toString());
+    if (params.page_size) searchParams.append('page_size', params.page_size.toString());
+    if (params.q) searchParams.append('q', params.q);
+    if (params.ioc_type) searchParams.append('ioc_type', params.ioc_type);
+    if (params.status) searchParams.append('status', params.status);
+    if (params.min_risk !== undefined) searchParams.append('min_risk', params.min_risk.toString());
+    if (params.max_risk !== undefined) searchParams.append('max_risk', params.max_risk.toString());
+    const query = searchParams.toString();
+    return request<IOCListResponse>(`/iocs${query ? `?${query}` : ''}`);
+  },
+
+  getIOC: (id: string): Promise<IOCDetail> => {
+    return request<IOCDetail>(`/iocs/${id}`);
+  },
+
+  getIOCRawRecords: (id: string): Promise<RawSourceRecord[]> => {
+    return request<RawSourceRecord[]>(`/iocs/${id}/raw`);
+  },
+
+  ingestIOC: (payload: IOCIngestPayload): Promise<CanonicalIOC> => {
+    return request<CanonicalIOC>('/iocs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  bulkIngestIOCs: (items: IOCIngestPayload[]): Promise<CanonicalIOC[]> => {
+    return request<CanonicalIOC[]>('/iocs/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  },
+
+  transitionIOC: (id: string, target_status: string, reason?: string): Promise<CanonicalIOC> => {
+    return request<CanonicalIOC>(`/iocs/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ target_status, reason }),
+    });
+  },
+
+  markIOCFalsePositive: (id: string, reason: string): Promise<CanonicalIOC> => {
+    return request<CanonicalIOC>(`/iocs/${id}/false-positive`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  revokeIOCFalsePositive: (id: string, reason: string): Promise<CanonicalIOC> => {
+    return request<CanonicalIOC>(`/iocs/${id}/false-positive?reason=${encodeURIComponent(reason)}`, {
+      method: 'DELETE',
+    });
   },
 };

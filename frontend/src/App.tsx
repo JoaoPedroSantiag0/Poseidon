@@ -6,6 +6,7 @@ import { api, clearAuthToken, getAuthToken } from './services/api';
 import type { Source, User } from './types';
 import { AuditView } from './views/AuditView';
 import { DashboardView } from './views/DashboardView';
+import { IOCView } from './views/IOCView';
 import { LoginView } from './views/LoginView';
 import { PlaceholderView } from './views/PlaceholderView';
 import { SourcesView } from './views/SourcesView';
@@ -97,6 +98,10 @@ export const App: React.FC = () => {
             <DashboardView sources={sources} onNavigate={setCurrentTab} />
           )}
 
+          {(currentTab === 'iocs' || currentTab === 'bulk-ioc') && (
+            <IOCView />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -105,6 +110,8 @@ export const App: React.FC = () => {
 
           {![
             'dashboard',
+            'iocs',
+            'bulk-ioc',
             'sources',
             'sources-settings',
             'audit',
