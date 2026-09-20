@@ -14,6 +14,7 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.ioc import CanonicalIOC, IOCLifecycleAudit, NormalizedEvidence, RawSourceRecord
+from app.models.relationship import CanonicalRelationship, compute_relationship_hash
 from app.models.source import SourceRegistry
 from app.models.user import Organization, User
 
@@ -22,6 +23,8 @@ __all__ = [
     "AuditLog",
     "Base",
     "CanonicalIOC",
+    "CanonicalRelationship",
+    "compute_relationship_hash",
     "ConfidenceLevel",
     "EpistemicClassification",
     "IOCLifecycleAudit",

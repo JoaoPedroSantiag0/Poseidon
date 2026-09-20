@@ -7,6 +7,7 @@ import {
   Database,
   Eye,
   Filter,
+  Network,
   Plus,
   RefreshCw,
   Search,
@@ -26,7 +27,11 @@ import {
 import { api } from '../services/api';
 import type { CanonicalIOC, IOCDetail, RawSourceRecord } from '../types';
 
-export const IOCView: React.FC = () => {
+interface IOCViewProps {
+  onNavigateToGraph?: (iocId: string) => void;
+}
+
+export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
   const [iocs, setIocs] = useState<CanonicalIOC[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -44,7 +49,9 @@ export const IOCView: React.FC = () => {
   const [selectedIOCId, setSelectedIOCId] = useState<string | null>(null);
   const [selectedIOCDetail, setSelectedIOCDetail] = useState<IOCDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<'overview' | 'lineage' | 'timeline'>('overview');
+  const [activeDetailTab, setActiveDetailTab] = useState<'overview' | 'lineage' | 'timeline' | 'graph'>('overview');
+  const [iocGraphData, setIocGraphData] = useState<any>(null);
+  const [isLoadingGraph, setIsLoadingGraph] = useState(false);
 
   // Ingestion Modal
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
@@ -105,6 +112,17 @@ export const IOCView: React.FC = () => {
       setIsLoadingDetail(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedIOCDetail && activeDetailTab === 'graph') {
+      setIsLoadingGraph(true);
+      api
+        .getIOCNeighborhood(selectedIOCDetail.id, 2)
+        .then((data) => setIocGraphData(data))
+        .catch((err) => console.error('Failed to load graph data', err))
+        .finally(() => setIsLoadingGraph(false));
+    }
+  }, [selectedIOCDetail, activeDetailTab]);
 
   const handleBulkIngest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -475,6 +493,15 @@ export const IOCView: React.FC = () => {
                           <Eye className="w-3 h-3 text-poseidon-cyan" />
                           Inspect
                         </button>
+                        {onNavigateToGraph && (
+                          <button
+                            onClick={() => onNavigateToGraph(ioc.id)}
+                            className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-poseidon-border hover:border-poseidon-cyan/60 rounded text-[11px] text-slate-400 hover:text-poseidon-cyan transition-colors"
+                            title="Explore in Knowledge Graph"
+                          >
+                            <Network className="w-3 h-3 text-poseidon-cyan" />
+                          </button>
+                        )}
                         {ioc.is_false_positive ? (
                           <button
                             onClick={() => handleRevokeFalsePositive(ioc)}
@@ -755,6 +782,17 @@ export const IOCView: React.FC = () => {
                 <Clock className="w-3.5 h-3.5" />
                 Lifecycle Audit Timeline ({selectedIOCDetail?.lifecycle_audits?.length || 0})
               </button>
+              <button
+                onClick={() => setActiveDetailTab('graph')}
+                className={`py-3 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
+                  activeDetailTab === 'graph'
+                    ? 'border-poseidon-cyan text-poseidon-cyan'
+                    : 'border-transparent text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                <Network className="w-3.5 h-3.5" />
+                Knowledge Graph ({iocGraphData?.edges?.length || 0})
+              </button>
             </div>
 
             {/* Modal Body */}
@@ -873,7 +911,7 @@ export const IOCView: React.FC = () => {
                     </div>
                   ))}
                 </div>
-              ) : (
+              ) : activeDetailTab === 'timeline' ? (
                 /* Timeline Audits Tab */
                 <div className="space-y-4">
                   {selectedIOCDetail.lifecycle_audits.map((audit, idx) => (
@@ -896,6 +934,87 @@ export const IOCView: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : (
+                /* Knowledge Graph Tab */
+                <div className="space-y-4">
+                  <div className="p-3 bg-slate-900/40 border border-poseidon-border rounded-lg text-xs text-slate-300 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white block">Relational Graph Context</span>
+                      <span className="text-slate-400 text-[11px]">
+                        Showing correlated entities within 2 hops of this indicator.
+                      </span>
+                    </div>
+                    {onNavigateToGraph && (
+                      <button
+                        onClick={() => {
+                          setSelectedIOCId(null);
+                          setSelectedIOCDetail(null);
+                          onNavigateToGraph(selectedIOCDetail.id);
+                        }}
+                        className="px-3 py-1.5 bg-poseidon-cyan text-poseidon-base font-bold text-xs rounded hover:bg-cyan-400 transition-colors flex items-center gap-1.5"
+                      >
+                        <Network className="w-3.5 h-3.5" />
+                        <span>Explore in Graph Console</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {isLoadingGraph ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-16 rounded-xl" />
+                      <Skeleton className="h-16 rounded-xl" />
+                    </div>
+                  ) : !iocGraphData || iocGraphData.edges.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-900/40 border border-poseidon-border rounded-xl space-y-3">
+                      <Network className="w-8 h-8 text-slate-500 mx-auto" />
+                      <p className="text-xs font-mono text-slate-300">
+                        No relationships discovered yet for this observable.
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Trigger live enrichment or run the automated correlation engine to link related infrastructure.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {iocGraphData.edges.map((edge: any) => {
+                        const targetNode = iocGraphData.nodes.find(
+                          (n: any) =>
+                            n.id === (edge.source === selectedIOCDetail.id ? edge.target : edge.source)
+                        );
+                        return (
+                          <div
+                            key={edge.id}
+                            className="p-4 bg-slate-900/80 border border-poseidon-border hover:border-poseidon-cyan/40 rounded-xl space-y-2 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="cyan">{edge.relationship_type}</Badge>
+                                <span className="font-mono text-xs text-white font-semibold">
+                                  {targetNode?.label || edge.target}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                {edge.epistemic_classification} ({Math.round(edge.confidence)}%)
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 bg-slate-950 rounded border border-slate-800/80 text-xs font-mono text-slate-300">
+                              <span className="text-slate-500 text-[10px] uppercase block mb-0.5">
+                                Provenance & Rationale:
+                              </span>
+                              {edge.rationale || 'Inferred via platform correlation heuristics.'}
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-1">
+                              <span>Source: {edge.source_name}</span>
+                              <span>Observed: {new Date(edge.last_seen).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

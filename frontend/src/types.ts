@@ -218,3 +218,123 @@ export interface IOCIngestPayload {
   initial_risk_score?: number;
   initial_confidence_score?: number;
 }
+
+// Knowledge Graph & Correlation Types
+export type RelationshipType =
+  | 'uses'
+  | 'targets'
+  | 'attributed-to'
+  | 'communicates-with'
+  | 'resolves-to'
+  | 'hosts'
+  | 'downloads'
+  | 'drops'
+  | 'delivers'
+  | 'exploits'
+  | 'indicates'
+  | 'related-to'
+  | 'variant-of'
+  | 'associated-with'
+  | 'observed-on'
+  | 'located-in'
+  | 'belongs-to'
+  | 'controls'
+  | 'uses-technique';
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  entity_type: string;
+  ioc_type?: string;
+  risk_score: number;
+  confidence_score: number;
+  status: string;
+  tlp: string;
+  tags: string[];
+  attributes?: Record<string, any>;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship_type: string;
+  epistemic_classification: string;
+  confidence: number;
+  rationale: string;
+  source_name: string;
+  source_ref_id?: string;
+  first_seen: string;
+  last_seen: string;
+  attributes?: Record<string, any>;
+}
+
+export interface GraphMetrics {
+  total_nodes: number;
+  total_edges: number;
+  max_depth: number;
+  density: number;
+  epistemic_breakdown: Record<string, number>;
+  relationship_breakdown: Record<string, number>;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  metrics: GraphMetrics;
+}
+
+export interface Relationship {
+  id: string;
+  source_id: string;
+  source_type: string;
+  target_id: string;
+  target_type: string;
+  relationship_type: RelationshipType;
+  epistemic_classification: EpistemicClassification;
+  confidence: number;
+  first_seen: string;
+  last_seen: string;
+  source_ref_id?: string;
+  source_name: string;
+  rationale: string;
+  attributes: Record<string, any>;
+  is_active: boolean;
+  relationship_hash: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RelationshipListResponse {
+  items: Relationship[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CreateRelationshipRequest {
+  source_id: string;
+  source_type?: string;
+  target_id: string;
+  target_type?: string;
+  relationship_type: RelationshipType;
+  confidence?: number;
+  epistemic_classification?: EpistemicClassification;
+  rationale: string;
+  source_name?: string;
+  attributes?: Record<string, any>;
+}
+
+export interface PathFindingResult {
+  found: boolean;
+  paths: string[][];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface CorrelationTriggerResponse {
+  relationships_created: number;
+  relationships_updated: number;
+  rules_executed: string[];
+  details: Record<string, any>[];
+}

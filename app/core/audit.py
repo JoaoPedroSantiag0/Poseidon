@@ -21,6 +21,7 @@ async def record_audit_event(
     reason: str | None = None,
     previous_state: dict[str, Any] | None = None,
     new_state: dict[str, Any] | None = None,
+    details: dict[str, Any] | None = None,
 ) -> AuditLog:
     """Creates and persists an immutable audit log entry."""
     audit_entry = AuditLog(
@@ -33,7 +34,7 @@ async def record_audit_event(
         user_agent=user_agent,
         reason=reason,
         previous_state=previous_state,
-        new_state=new_state,
+        new_state=new_state or details,
     )
     session.add(audit_entry)
     await session.flush()
@@ -47,3 +48,7 @@ async def record_audit_event(
         ip_address=ip_address
     )
     return audit_entry
+
+
+# Alias for operational convenience
+record_audit_log = record_audit_event

@@ -1,10 +1,16 @@
 import type {
   AuditLog,
   CanonicalIOC,
+  CorrelationTriggerResponse,
+  CreateRelationshipRequest,
+  GraphData,
   IOCDetail,
   IOCIngestPayload,
   IOCListResponse,
+  PathFindingResult,
   RawSourceRecord,
+  Relationship,
+  RelationshipListResponse,
   Source,
   TokenResponse,
   User,
@@ -196,6 +202,81 @@ export const api = {
   }> => {
     return request(`/sources/${id}/sync?limit=${limit}`, {
       method: 'POST',
+    });
+  },
+
+  // Knowledge Graph & Correlation
+  getIOCNeighborhood: (
+    iocId: string,
+    depth = 2,
+    direction = 'BOTH',
+    minConfidence = 0
+  ): Promise<GraphData> => {
+    return request<GraphData>(
+      `/graph/iocs/${iocId}/neighborhood?depth=${depth}&direction=${direction}&min_confidence=${minConfidence}`
+    );
+  },
+
+  traverseGraph: (params: {
+    seed_ids: string[];
+    depth?: number;
+    direction?: string;
+    min_confidence?: number;
+    allowed_relationship_types?: string[];
+  }): Promise<GraphData> => {
+    return request<GraphData>('/graph/traversal', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  findShortestPath: (
+    startId: string,
+    endId: string,
+    maxDepth = 5
+  ): Promise<PathFindingResult> => {
+    return request<PathFindingResult>(
+      `/graph/paths?start_id=${encodeURIComponent(startId)}&end_id=${encodeURIComponent(endId)}&max_depth=${maxDepth}`
+    );
+  },
+
+  listRelationships: (params?: {
+    source_id?: string;
+    target_id?: string;
+    relationship_type?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<RelationshipListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.source_id) searchParams.set('source_id', params.source_id);
+    if (params?.target_id) searchParams.set('target_id', params.target_id);
+    if (params?.relationship_type) searchParams.set('relationship_type', params.relationship_type);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<RelationshipListResponse>(`/graph/relationships${query}`);
+  },
+
+  createRelationship: (payload: CreateRelationshipRequest): Promise<Relationship> => {
+    return request<Relationship>('/graph/relationships', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteRelationship: (id: string): Promise<{ status: string; message: string }> => {
+    return request<{ status: string; message: string }>(`/graph/relationships/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  triggerCorrelation: (params?: {
+    ioc_id?: string;
+    rule_types?: string[];
+  }): Promise<CorrelationTriggerResponse> => {
+    return request<CorrelationTriggerResponse>('/graph/correlate', {
+      method: 'POST',
+      body: JSON.stringify(params || {}),
     });
   },
 };

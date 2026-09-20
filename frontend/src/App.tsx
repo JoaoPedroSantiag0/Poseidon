@@ -6,6 +6,7 @@ import { api, clearAuthToken, getAuthToken } from './services/api';
 import type { Source, User } from './types';
 import { AuditView } from './views/AuditView';
 import { DashboardView } from './views/DashboardView';
+import { GraphView } from './views/GraphView';
 import { IOCView } from './views/IOCView';
 import { LoginView } from './views/LoginView';
 import { PlaceholderView } from './views/PlaceholderView';
@@ -14,6 +15,7 @@ import { SourcesView } from './views/SourcesView';
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
+  const [selectedGraphIOCId, setSelectedGraphIOCId] = useState<string | undefined>(undefined);
   const [sources, setSources] = useState<Source[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -38,7 +40,7 @@ export const App: React.FC = () => {
       const user = await api.getMe();
       setCurrentUser(user);
       await fetchSources();
-    } catch (err) {
+    } catch {
       clearAuthToken();
       setCurrentUser(null);
     } finally {
@@ -99,7 +101,21 @@ export const App: React.FC = () => {
           )}
 
           {(currentTab === 'iocs' || currentTab === 'bulk-ioc') && (
-            <IOCView />
+            <IOCView
+              onNavigateToGraph={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('graph');
+              }}
+            />
+          )}
+
+          {currentTab === 'graph' && (
+            <GraphView
+              initialSeedId={selectedGraphIOCId}
+              onOpenIOCDetail={() => {
+                setCurrentTab('iocs');
+              }}
+            />
           )}
 
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
@@ -112,6 +128,7 @@ export const App: React.FC = () => {
             'dashboard',
             'iocs',
             'bulk-ioc',
+            'graph',
             'sources',
             'sources-settings',
             'audit',
