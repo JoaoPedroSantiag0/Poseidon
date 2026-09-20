@@ -75,3 +75,8 @@ def validate_outbound_url(url: str) -> str:
         raise ValueError(f"Unable to resolve host '{hostname}': {exc!s}") from exc
 
     return url
+
+
+# Convenient alias
+validate_destination = validate_outbound_url
+

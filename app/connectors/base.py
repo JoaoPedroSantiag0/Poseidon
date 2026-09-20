@@ -58,3 +58,8 @@ class BaseCTIConnector(ABC):
     @abstractmethod
     def get_rate_limits(self) -> RateLimitSpec:
         """Returns rate-limiting and quota specifications enforced by this source."""
+
+    async def fetch_feed(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Fetches batch updates or recent observables from the feed if supported."""
+        return []
+

@@ -80,24 +80,91 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         )
         session.add(viewer)
 
-        # Seed sample source
-        sample_source = SourceRegistry(
-            id="threatfox",
-            name="abuse.ch ThreatFox",
-            vendor="abuse.ch",
-            category=SourceCategory.COMMUNITY,
-            documentation_url="https://threatfox.abuse.ch/api/",
-            base_url="https://threatfox-api.abuse.ch/api/v1/",
-            api_version="v1",
-            auth_type="AUTH_KEY",
-            is_enabled=True,
-            health_status=SourceHealthStatus.CONNECTED,
-            rate_limit_per_minute=60,
-            cost_class="COMMUNITY",
-            supported_ioc_types=["ipv4", "domain", "url"],
-            supported_capabilities=["lookup", "enrich"]
-        )
-        session.add(sample_source)
+        # Seed sample sources
+        sources = [
+            SourceRegistry(
+                id="threatfox",
+                name="abuse.ch ThreatFox",
+                vendor="abuse.ch",
+                category=SourceCategory.COMMUNITY,
+                documentation_url="https://threatfox.abuse.ch/api/",
+                base_url="https://threatfox-api.abuse.ch/api/v1/",
+                api_version="v1",
+                auth_type="AUTH_KEY",
+                is_enabled=True,
+                health_status=SourceHealthStatus.CONNECTED,
+                rate_limit_per_minute=60,
+                cost_class="COMMUNITY",
+                supported_ioc_types=["ipv4", "domain", "url"],
+                supported_capabilities=["lookup", "enrich"],
+            ),
+            SourceRegistry(
+                id="urlhaus",
+                name="abuse.ch URLhaus",
+                vendor="abuse.ch",
+                category=SourceCategory.COMMUNITY,
+                documentation_url="https://urlhaus.abuse.ch/api/",
+                base_url="https://urlhaus-api.abuse.ch/v1/",
+                api_version="v1",
+                auth_type="AUTH_KEY",
+                is_enabled=True,
+                health_status=SourceHealthStatus.CONNECTED,
+                rate_limit_per_minute=60,
+                cost_class="COMMUNITY",
+                supported_ioc_types=["url", "domain", "ipv4"],
+                supported_capabilities=["lookup", "enrich"],
+            ),
+            SourceRegistry(
+                id="malwarebazaar",
+                name="abuse.ch MalwareBazaar",
+                vendor="abuse.ch",
+                category=SourceCategory.COMMUNITY,
+                documentation_url="https://bazaar.abuse.ch/api/",
+                base_url="https://mb-api.abuse.ch/api/v1/",
+                api_version="v1",
+                auth_type="AUTH_KEY",
+                is_enabled=True,
+                health_status=SourceHealthStatus.CONNECTED,
+                rate_limit_per_minute=60,
+                cost_class="COMMUNITY",
+                supported_ioc_types=["hash_md5", "hash_sha1", "hash_sha256"],
+                supported_capabilities=["lookup", "enrich"],
+            ),
+            SourceRegistry(
+                id="abuseipdb",
+                name="AbuseIPDB",
+                vendor="AbuseIPDB",
+                category=SourceCategory.FREE_WITH_ACCOUNT,
+                documentation_url="https://docs.abuseipdb.com/",
+                base_url="https://api.abuseipdb.com/api/v2/",
+                api_version="v2",
+                auth_type="API_KEY",
+                is_enabled=True,
+                health_status=SourceHealthStatus.CONNECTED,
+                rate_limit_per_minute=60,
+                cost_class="FREE_WITH_ACCOUNT",
+                supported_ioc_types=["ipv4", "ipv6"],
+                supported_capabilities=["lookup", "enrich"],
+            ),
+            SourceRegistry(
+                id="greynoise",
+                name="GreyNoise v3 Community",
+                vendor="GreyNoise",
+                category=SourceCategory.COMMUNITY,
+                documentation_url="https://docs.greynoise.io/",
+                base_url="https://api.greynoise.io/v3/community/",
+                api_version="v3",
+                auth_type="NONE",
+                is_enabled=True,
+                health_status=SourceHealthStatus.CONNECTED,
+                rate_limit_per_minute=30,
+                cost_class="COMMUNITY",
+                supported_ioc_types=["ipv4"],
+                supported_capabilities=["lookup", "enrich"],
+            ),
+        ]
+        for src in sources:
+            session.add(src)
 
         await session.commit()
         yield session

@@ -25,7 +25,26 @@ export const SourcesView: React.FC<SourcesViewProps> = ({ sources, onRefreshSour
   const [isEnabledInput, setIsEnabledInput] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean; message: string; latency?: number } | null>(null);
+
+  const handleSyncFeed = async (sourceId: string) => {
+    setSyncingId(sourceId);
+    try {
+      const res = await api.syncSourceFeed(sourceId, 50);
+      alert(
+        `Feed Synchronized successfully!\n\n` +
+        `• Source: ${sourceId}\n` +
+        `• Records Fetched: ${res.feed_records_fetched}\n` +
+        `• Observables Ingested/Updated: ${res.iocs_ingested_or_updated}`
+      );
+      onRefreshSources();
+    } catch (err: any) {
+      alert(`Sync failed: ${err.message}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const handleOpenConfigure = (source: Source) => {
     setSelectedSource(source);
@@ -207,6 +226,17 @@ export const SourcesView: React.FC<SourcesViewProps> = ({ sources, onRefreshSour
                   <RefreshCw className={`w-3 h-3 text-poseidon-cyan ${isTesting ? 'animate-spin' : ''}`} />
                   <span>{isTesting ? 'Testing...' : 'Test'}</span>
                 </button>
+                {src.supported_capabilities.includes('feed') && (
+                  <button
+                    onClick={() => handleSyncFeed(src.id)}
+                    disabled={syncingId === src.id}
+                    className="py-1.5 px-2.5 rounded-lg bg-poseidon-elevated hover:bg-slate-700 text-xs text-poseidon-cyan font-medium transition-colors border border-poseidon-cyan/30 flex items-center justify-center gap-1 disabled:opacity-50"
+                    title="Pull latest observables from feed"
+                  >
+                    <Radio className={`w-3 h-3 text-poseidon-cyan ${syncingId === src.id ? 'animate-pulse' : ''}`} />
+                    <span>{syncingId === src.id ? 'Syncing...' : 'Sync'}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => handleOpenConfigure(src)}
                   className="py-1.5 px-3 rounded-lg bg-poseidon-cyan/15 hover:bg-poseidon-cyan/25 text-poseidon-cyan text-xs font-semibold transition-colors border border-poseidon-cyan/30 flex items-center gap-1"

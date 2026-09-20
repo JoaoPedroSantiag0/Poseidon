@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db, require_permission
 from app.core.audit import record_audit_event
 from app.core.errors import ErrorCode, PoseidonException
-from app.core.rbac import PERM_IOC_READ, PERM_IOC_WRITE
+from app.core.rbac import PERM_ENRICH_EXECUTE, PERM_IOC_READ, PERM_IOC_WRITE
 from app.models.enums import TLP, EpistemicClassification, IOCStatus, IOCType
 from app.models.ioc import CanonicalIOC, RawSourceRecord
 from app.models.user import User
@@ -382,3 +382,34 @@ async def revoke_ioc_false_positive(
     await db.commit()
     await db.refresh(updated_ioc)
     return updated_ioc
+
+
+@router.post(
+    "/{ioc_id}/enrich",
+    summary="Trigger on-demand multi-source enrichment",
+)
+async def enrich_ioc(
+    ioc_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(PERM_ENRICH_EXECUTE)),
+):
+    """Orchestrates concurrent querying against all active connectors supporting this observable type."""
+    from app.services.enrichment import EnrichmentOrchestrator
+
+    result = await EnrichmentOrchestrator.enrich_ioc(db, ioc_id, user_id=current_user.id)
+
+    await record_audit_event(
+        session=db,
+        action="ioc_enrichment_executed",
+        resource_type="CanonicalIOC",
+        resource_id=ioc_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        ip_address=request.client.host if request.client else None,
+        reason=f"Enrichment triggered by {current_user.email}",
+        new_state=result,
+    )
+    await db.commit()
+    return result
+

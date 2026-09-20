@@ -172,4 +172,30 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  enrichIOC: (id: string): Promise<{
+    ioc_id: string;
+    normalized_value: string;
+    sources_queried: number;
+    sources_found: number;
+    new_risk_score: number;
+    new_confidence_score: number;
+    new_evidences_count: number;
+    status: string;
+  }> => {
+    return request(`/iocs/${id}/enrich`, {
+      method: 'POST',
+    });
+  },
+
+  syncSourceFeed: (id: string, limit = 50): Promise<{
+    source_id: string;
+    feed_records_fetched: number;
+    iocs_ingested_or_updated: number;
+    timestamp: string;
+  }> => {
+    return request(`/sources/${id}/sync?limit=${limit}`, {
+      method: 'POST',
+    });
+  },
 };

@@ -13,6 +13,7 @@ import {
   Shield,
   ShieldAlert,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   Badge,
@@ -56,6 +57,9 @@ export const IOCView: React.FC = () => {
   const [fpModalIOC, setFpModalIOC] = useState<CanonicalIOC | null>(null);
   const [fpReason, setFpReason] = useState('');
   const [isSubmittingFP, setIsSubmittingFP] = useState(false);
+
+  // Live Multi-Source Enrichment
+  const [enrichingIOCId, setEnrichingIOCId] = useState<string | null>(null);
 
   const fetchIOCs = async () => {
     setIsLoading(true);
@@ -183,6 +187,30 @@ export const IOCView: React.FC = () => {
       }
     } catch (err: any) {
       alert(`Transition error: ${err.message}`);
+    }
+  };
+
+  const handleEnrich = async (ioc: CanonicalIOC) => {
+    setEnrichingIOCId(ioc.id);
+    try {
+      const summary = await api.enrichIOC(ioc.id);
+      alert(
+        `Multi-Source Enrichment completed for ${ioc.normalized_value}!\n\n` +
+        `• Active Connectors Queried: ${summary.sources_queried}\n` +
+        `• Corroborating Sources: ${summary.sources_found}\n` +
+        `• Updated Risk Score: ${summary.new_risk_score} / 100\n` +
+        `• Multi-Source Confidence: ${summary.new_confidence_score}%\n` +
+        `• Extracted Evidences: ${summary.new_evidences_count}\n` +
+        `• Lifecycle State: ${summary.status}`
+      );
+      fetchIOCs();
+      if (selectedIOCId === ioc.id) {
+        handleOpenDetail(ioc);
+      }
+    } catch (err: any) {
+      alert(`Enrichment failed: ${err.message}`);
+    } finally {
+      setEnrichingIOCId(null);
     }
   };
 
@@ -432,6 +460,15 @@ export const IOCView: React.FC = () => {
                     <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => handleEnrich(ioc)}
+                          disabled={enrichingIOCId === ioc.id}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-poseidon-border hover:border-poseidon-gold/60 rounded text-[11px] text-slate-300 flex items-center gap-1 transition-colors disabled:opacity-50"
+                          title="Trigger multi-source live enrichment"
+                        >
+                          <Zap className={`w-3 h-3 text-poseidon-gold ${enrichingIOCId === ioc.id ? 'animate-bounce' : ''}`} />
+                          {enrichingIOCId === ioc.id ? '...' : 'Enrich'}
+                        </button>
+                        <button
                           onClick={() => handleOpenDetail(ioc)}
                           className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-poseidon-border rounded text-[11px] text-slate-300 flex items-center gap-1 transition-colors"
                         >
@@ -649,6 +686,16 @@ export const IOCView: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3">
+                {selectedIOCDetail && (
+                  <button
+                    onClick={() => handleEnrich(selectedIOCDetail)}
+                    disabled={enrichingIOCId === selectedIOCDetail.id}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-poseidon-cyan hover:bg-sky-400 text-slate-950 font-bold rounded text-xs transition-colors disabled:opacity-50 shadow-sm"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-slate-950" />
+                    {enrichingIOCId === selectedIOCDetail.id ? 'Enriching...' : 'Live Enrich'}
+                  </button>
+                )}
                 {selectedIOCDetail && (
                   <div className="flex items-center gap-2">
                     <select
