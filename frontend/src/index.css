@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-poseidon-base text-slate-200 font-sans antialiased selection:bg-poseidon-cyan selection:text-poseidon-base;
+    margin: 0;
+    min-height: 100vh;
+  }
+}

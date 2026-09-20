@@ -1,0 +1,115 @@
+import React, { useEffect, useState } from 'react';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { api, clearAuthToken, getAuthToken } from './services/api';
+import type { Source, User } from './types';
+import { AuditView } from './views/AuditView';
+import { DashboardView } from './views/DashboardView';
+import { LoginView } from './views/LoginView';
+import { PlaceholderView } from './views/PlaceholderView';
+import { SourcesView } from './views/SourcesView';
+
+export const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentTab, setCurrentTab] = useState('dashboard');
+  const [sources, setSources] = useState<Source[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchSources = async () => {
+    try {
+      const data = await api.listSources();
+      setSources(data);
+    } catch (err) {
+      console.error('Failed to load sources', err);
+    }
+  };
+
+  const checkAuth = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const user = await api.getMe();
+      setCurrentUser(user);
+      await fetchSources();
+    } catch (err) {
+      clearAuthToken();
+      setCurrentUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const handleLoginSuccess = async (user: User) => {
+    setCurrentUser(user);
+    await fetchSources();
+  };
+
+  const handleLogout = async () => {
+    await api.logout();
+    setCurrentUser(null);
+    setCurrentTab('dashboard');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-poseidon-base flex items-center justify-center font-mono text-xs text-poseidon-cyan">
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-poseidon-cyan animate-ping" />
+          <span>INITIALIZING POSEIDON CTI ENCLAVE...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginView onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  return (
+    <div className="flex h-screen bg-poseidon-base text-slate-200 overflow-hidden font-sans">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Layout Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header currentTab={currentTab} />
+
+        <main className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+          {currentTab === 'dashboard' && (
+            <DashboardView sources={sources} onNavigate={setCurrentTab} />
+          )}
+
+          {(currentTab === 'sources' || currentTab === 'sources-settings') && (
+            <SourcesView sources={sources} onRefreshSources={fetchSources} />
+          )}
+
+          {currentTab === 'audit' && <AuditView />}
+
+          {![
+            'dashboard',
+            'sources',
+            'sources-settings',
+            'audit',
+          ].includes(currentTab) && (
+            <PlaceholderView tab={currentTab} onNavigate={setCurrentTab} />
+          )}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default App;

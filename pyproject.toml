@@ -1,0 +1,28 @@
+[project]
+name = "poseidon-cti"
+version = "0.1.0"
+description = "Poseidon Cyber Threat Intelligence Platform"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "B008",  # FastAPI Depends in function arguments
+    "UP042", # str, Enum inheritance for SQLAlchemy serialization
+    "E501",  # Line length
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
