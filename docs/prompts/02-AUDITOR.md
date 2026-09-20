@@ -71,7 +71,7 @@ Verifique, uma a uma, as treze leis. Especificamente:
 - Foi inventado schema onde OCSF/STIX/Sigma/ATT&CK resolveriam? (Lei 2)
 - Entrou algo de `wazuh-dashboard` no repositório? (Lei 3)
 - O modelo de evento foi congelado com uma fonte só? (Lei 4)
-- `event_time` e `ingestion_time` são distintos e o bruto foi preservado? (Lei 5)
+- tempo do evento e tempo de ingestão são conceitos distintos e preenchidos, com os nomes do padrão do ADR-002, e o bruto foi preservado? (Lei 5)
 - Case Timeline e Audit Log estão separados, e o Audit Log é append-only de verdade? (Lei 6)
 - Algum veredito de IOC persiste sem fonte, confiança e datas? (Lei 7)
 - Existe qualquer caminho, direto ou indireto, para executar comando arbitrário no
@@ -120,7 +120,7 @@ Cite suas fontes com URL e data. Seu relatório precisa ser auditável por terce
 - Concorrência: o que acontece com dois eventos idênticos simultâneos? reprocessamento
   duplica?
 - Fuso horário e horário de verão em tudo que envolve tempo
-- Ordem de eventos fora de sequência — chega um evento com `event_time` anterior ao
+- Ordem de eventos fora de sequência — chega um evento cujo tempo de evento é anterior ao
   último processado; o sistema lida?
 - Falha parcial: banco grava e fila falha; agente executa e o ACK se perde
 - Migração: `downgrade` funciona mesmo? com dados dentro?
@@ -261,7 +261,7 @@ Procure ativamente por cada uma. Elas são as que realmente machucam o Poseidon.
    quando ele está atrás de DNS dinâmico, ou que libera por porta em vez de por processo.
 4. **Event Model moldado ao Wazuh** — campos que só existem porque o alerta do Wazuh tem
    aquela forma.
-5. **`event_time` colapsado com `ingestion_time`**, ou evento bruto descartado após
+5. **Tempo do evento colapsado com tempo de ingestão**, ou evento bruto descartado após
    normalização.
 6. **IOC como string** em qualquer lugar do código, ou reputação sem proveniência.
 7. **Audit Log gravável**, ou misturado com a Case Timeline.

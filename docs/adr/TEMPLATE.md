@@ -44,7 +44,7 @@
 - [ ] Lei 2 — Não inventamos schema (OCSF/STIX/Sigma/MITRE)
 - [ ] Lei 3 — Não forkamos o wazuh-dashboard
 - [ ] Lei 4 — Nenhum modelo de evento nasce de uma fonte só
-- [ ] Lei 5 — event_time nunca é ingestion_time
+- [ ] Lei 5 — O tempo do evento nunca é o tempo de ingestão
 - [ ] Lei 6 — Case Timeline e Audit Log são coisas diferentes
 - [ ] Lei 7 — IOC não é string, inteligência carrega proveniência
 - [ ] Lei 8 — O Collector Agent não executa comandos arbitrários
@@ -52,6 +52,7 @@
 - [ ] Lei 10 — Isolamento tem failsafe ou não existe
 - [ ] Lei 11 — O Collector não coleta segredos
 - [ ] Lei 12 — O SOC monitora a si mesmo
+- [ ] Lei 13 — Atribuição e proteção de dados são requisitos de schema, não rodapé
 
 ## 6. Referências
 

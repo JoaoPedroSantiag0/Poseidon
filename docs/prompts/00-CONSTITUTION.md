@@ -5,7 +5,14 @@
 > Este documento tem precedência sobre qualquer instrução de papel
 > (`01-BUILDER.md`, `02-AUDITOR.md`) e sobre qualquer preferência do modelo.
 >
-> Versão: **2.0** · Status: vigente · Emendada em 2026-09-20
+> Versão: **2.1** · Status: vigente · Emendada em 2026-09-20
+>
+> **Emenda 2.1** — resposta aos três BLOCKER da segunda rodada de auditoria
+> (`03-AUDIT-REPORT-v2.md`), dois deles **criados pela emenda 2.0**. Mudaram: Lei 4 (dois
+> corpora obrigatórios, não um), Lei 10 (a expiração é o objeto assinado da Lei 9; base de
+> tempo monotônica; watchdog cobre falha, não remoção; recuperação fora de banda é local e
+> canal remoto é proibido) e §4 (ETW deixa de ser afirmação e passa a declarar a origem de
+> cada campo, com o custo da troca registrado).
 >
 > **Emenda 2.0** — motivada pela auditoria da Fase 0 (`docs/gates/FASE-00/03-AUDIT-REPORT.md`,
 > 4 BLOCKER) e por duas decisões do humano: o Poseidon tem ambição de **SaaS**, e o
@@ -97,12 +104,19 @@ com outro nome. Por isso **decidir o padrão e congelar o modelo são atos separ
   fontes heterogêneas** — telemetria de endpoint via Collector Agent, e alertas do Wazuh.
   O congelamento é artefato explícito, com ADR próprio (`Supersedes: ADR-002`).
 
-Para antecipar a segunda fonte sem antecipar a integração: um **corpus gravado de alertas
-reais do Wazuh** (subir um container uma vez e capturar `alerts.json`) exercita o
-normalizador na Fase 3 sem exigir Wazuh integrado. Isso é obrigatório, não opcional —
-sem ele, a Fase 3 modela contra zero fontes reais.
+Para antecipar as duas fontes sem antecipar as integrações, a Fase 3 exige **dois corpora
+gravados, obrigatórios e heterogêneos entre si**:
 
-### Lei 5 — `event_time` nunca é `ingestion_time`
+1. **Alertas reais do Wazuh** — subir um container uma vez e capturar `alerts.json`.
+2. **Telemetria bruta de endpoint** — ETW e Security Log capturados de uma máquina real,
+   antes do Collector existir, com um script descartável.
+
+Um corpus só não cumpre a Lei 4: modelaria contra fonte única, apenas trocando o Wazuh
+pelo Sysmon como molde. São **duas naturezas diferentes de dado** — alerta já interpretado
+por um motor de terceiro versus telemetria bruta de sistema operacional — e é justamente a
+tensão entre elas que expõe as premissas escondidas do normalizador.
+
+### Lei 5 — O tempo do evento nunca é o tempo de ingestão
 
 **Esta lei enuncia requisitos semânticos, não nomes de campo.** Os nomes concretos são os
 do padrão adotado no ADR-002 — inventá-los aqui violaria a Lei 2. Todo evento carrega,
@@ -232,15 +246,28 @@ Requisitos obrigatórios e simultâneos:
    com transporte exclusivamente outbound, um host totalmente isolado é um host que o
    Poseidon não alcança mais, e prometer contenção total sem dizer isso é mentir para o
    analista no pior momento possível.
-3. **Expiração absoluta persistida em disco.** Toda ação de isolamento grava um instante de
-   expiração. Passado esse instante sem reautorização, o isolamento cai.
-4. **Watchdog independente do serviço do agente** — mecanismo do sistema operacional, não
-   um timer dentro do processo — responsável por honrar a expiração do item 3 mesmo que o
-   agente esteja morto, travado ou desinstalado.
-5. **Caminho de recuperação fora de banda**, documentado e **testado**, capaz de remover o
-   isolamento de uma máquina cujo agente não responde mais. Nenhuma capacidade de
-   isolamento vai para produção antes deste caminho existir e ter sido exercitado.
-6. **Teste obrigatório em VM descartável** antes de qualquer execução em máquina real.
+3. **A expiração é o objeto de ação assinado da Lei 9, persistido íntegro** — nunca um
+   timestamp solto derivado dele. Um host isolado é, por premissa, um host comprometido:
+   se a expiração for um valor editável em disco, o atacante libera a própria máquina e o
+   evento fica indistinguível de uma expiração legítima. Quem restaura **verifica a
+   assinatura antes de restaurar**; falha na verificação mantém o isolamento (falha-fechado)
+   e gera sinal de severidade alta — adulteração detectada significa que o host contido
+   está sendo operado.
+4. **A base de tempo não pode ser o relógio de parede do host isolado.** Mínimo: relógio
+   monotônico desde a aplicação, imune a salto de relógio; divergência entre monotônico e
+   relógio de parede é sinal (Lei 12).
+5. **Watchdog independente do processo do agente**, nomeado explicitamente no ADR-006, para
+   o caso de **falha** do agente (crash, travamento). O caso de **remoção deliberada** do
+   agente não é cobrível localmente — quem tem privilégio para matar o agente tem
+   privilégio para remover o watchdog — e pertence ao item 6. O ADR-006 declara também qual
+   componente é a fonte da verdade do estado de isolamento quando agente e watchdog
+   discordam.
+6. **Caminho de recuperação fora de banda, obrigatoriamente local** — acesso físico ou
+   console, mídia de boot, modo de segurança, procedimento documentado de remoção do
+   filtro. **Canal remoto de recuperação é proibido**: ou ele é uma exceção de firewall não
+   declarada que o atacante no host pode tentar usar, ou não funciona. Documentado e
+   **testado**; nenhuma capacidade de isolamento vai para produção antes disso.
+7. **Teste obrigatório em VM descartável** antes de qualquer execução em máquina real.
    Nenhum PR de isolamento é aprovado sem evidência desse teste.
 
 A Lei 10 distingue **"perdeu contato porque algo quebrou"** de **"perdeu contato porque foi
@@ -349,14 +376,29 @@ TanStack Query/Router/Table · Cytoscape.js (entity graph) · Vitest + Playwrigh
 **Collector Agent** — **Go 1.22+**, binário estático único, sem runtime externo.
 Serviço Windows nativo. Buffer local em bbolt/SQLite com teto de tamanho.
 
-**Fonte de telemetria: ETW direto, não Sysmon.** A EULA do Sysinternals proíbe
+**Fonte de telemetria: ETW + Windows Event Log, não Sysmon.** A EULA do Sysinternals proíbe
 redistribuição e veda *"use the software for commercial software hosting services"*. Como o
 Poseidon tem ambição de SaaS (decisão registrada, 2026-09-20), depender de Sysmon é
-inviável no produto. O Collector consome **ETW** (`Microsoft-Windows-Kernel-Process`,
-`Microsoft-Windows-DNS-Client` e equivalentes) e o **Windows Event Log** via `wevtapi.dll`
-(`EvtSubscribe`/`EvtRender` sobre `golang.org/x/sys/windows`, sem CGO). O Sysmon pode ser
-usado como **referência de laboratório** para comparar cobertura, nunca como dependência
-do produto, e o instalador do Poseidon jamais o empacota.
+inviável no produto. O Sysmon serve apenas como **referência de laboratório** para comparar
+cobertura, e o instalador do Poseidon jamais o empacota.
+
+**Esta troca tem custo, e o custo é declarado aqui, não descoberto na Fase 5.** O provedor
+`Microsoft-Windows-Kernel-Process` **não entrega linha de comando de forma confiável**, nem
+linha de comando do processo pai, nem hashes, nem GUID de processo imune a reúso de PID.
+Portanto a §4 declara **de onde vem cada campo**, não apenas qual API é usada:
+
+| Campo | Origem |
+|---|---|
+| criação de processo, rede, DNS | ETW (`Kernel-Process`, `Kernel-Network`, `DNS-Client`) via Go sem CGO |
+| **linha de comando** | **Security Event ID 4688** via `wevtapi.dll` — exige a GPO *"Include command line in process creation events"* como **requisito de implantação declarado**; sua ausência é degradação de saúde reportada pelo Health Center (Lei 12), nunca silêncio |
+| hashes de imagem | calculados pelo próprio Collector, com o custo de I/O e a corrida com exclusão de arquivo assumidos |
+| linha de comando do pai | derivada de árvore de processos mantida em memória pelo agente — decisão e consequências no ADR-005 |
+
+O provedor `Microsoft-Windows-Threat-Intelligence`, que traria paridade real, exige processo
+**PPL com atributo Antimalware**, o que exige driver **ELAM** co-assinado pela Microsoft.
+Está fora do alcance do MVP. **Paridade plena com um EDR comercial exige componente em modo
+kernel assinado — esse é o custo estratégico da decisão de SaaS, e fica registrado como
+dívida conhecida, não como surpresa futura.**
 Transporte **HTTPS + mTLS, exclusivamente outbound**, com *polling* para ações pendentes
 (não usamos conexão de entrada: o agente precisa funcionar atrás de NAT, proxy e,
 principalmente, durante o próprio isolamento).
@@ -523,12 +565,17 @@ Inventar para não parar é falha grave. Parar e perguntar é comportamento corr
 
 Para proteger o projeto de morrer de ambição, está explicitamente **fora** do MVP:
 
-NDR · UEBA · IA tomando ação autônoma · resposta automática sem aprovação humana ·
-isolamento total · agentes Linux/macOS · correlação avançada com machine learning ·
-marketplace de integrações · chat entre IAs como funcionalidade do produto.
+**Adiado — cabe depois da Fase 13, não antes:** NDR · UEBA · IA tomando ação autônoma ·
+agentes Linux/macOS · correlação avançada com machine learning · marketplace de
+integrações · chat entre IAs como funcionalidade do produto.
 
-Proposta de qualquer um desses itens antes da Fase 13 deve ser recusada pelo Auditor como
-desvio de escopo, ainda que tecnicamente elegante.
+**Vedado — não é questão de prazo:** resposta automática sem aprovação humana, e
+**isolamento total** (Lei 10, item 2). Estes não voltam por antiguidade; só por emenda
+explícita desta constituição, que teria de enfrentar o motivo pelo qual foram vedados.
+
+Proposta de qualquer item da primeira lista antes da Fase 13, ou de qualquer item da
+segunda em qualquer momento, deve ser recusada pelo Auditor como desvio de escopo, ainda
+que tecnicamente elegante.
 
 ### Multi-tenancy: não construída, mas não impedida
 
