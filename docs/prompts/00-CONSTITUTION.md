@@ -307,6 +307,24 @@ dado**, não com o repositório:
   SaaS é questão de licenciamento, não de engenharia. Nenhum feed entra em produção sem
   que seus termos tenham sido lidos e registrados em ADR.
 
+**Consequência arquitetural: política por fonte, não decisão global.** Todo conector de CTI
+declara, como parte do seu contrato, o que lhe é permitido:
+
+```
+consulta ao vivo · cache e TTL · persistir veredito · persistir acervo ·
+exibir ao cliente · exige tier comercial pago
+```
+
+O motor de CTI aplica essa política na consulta e na exibição. Isso é possível porque a
+Lei 7 já obriga cada observação a carregar sua fonte — e é o que transforma a proveniência
+de recurso de qualidade em mecanismo de conformidade.
+
+**A distinção que governa tudo:** o **acervo do terceiro** (pulses, listas, descrições) é
+restrito e replicável por qualquer concorrente. As **observações do Poseidon** (*"vimos o
+IOC X no host Y em T"*) são inteiramente suas, sem restrição, e são o ativo que compõe com
+o tempo. O armazém de observações próprias é entidade de primeira classe; o acervo de
+terceiros é cache governado por política.
+
 E, porque o Poseidon processa telemetria de endpoints de pessoas físicas em nome de
 terceiros: **a LGPD se aplica, e o Poseidon é operador de dados pessoais.** Isso não é item
 de conformidade para a Fase 15. É requisito de desenho — finalidade declarada, minimização,
@@ -544,6 +562,12 @@ Ambos os papéis **param e perguntam ao humano** — não decidem sozinhos — q
 6. Builder e Auditor chegam a impasse técnico após um ciclo de remediação.
 
 Inventar para não parar é falha grave. Parar e perguntar é comportamento correto.
+
+**As decisões já tomadas pelo humano estão em [`docs/DECISOES-DO-HUMANO.md`]
+(../DECISOES-DO-HUMANO.md), têm a mesma precedência deste documento, e devem ser lidas
+junto com ele.** Nenhum ADR pode contradizê-las; ADR que dependa de uma delas deve citá-la.
+Não repropor uma decisão registrada ali — se houver razão técnica para revê-la, levante
+como achado e deixe a revisão para o humano.
 
 ---
 

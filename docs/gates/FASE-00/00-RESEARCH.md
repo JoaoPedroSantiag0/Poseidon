@@ -75,6 +75,20 @@ A verificação foi executada diretamente nos arquivos `LICENSE` dos repositóri
 - Wazuh Indexer API: [https://documentation.wazuh.com/current/user-manual/wazuh-indexer/indexer-api.html](https://documentation.wazuh.com/current/user-manual/wazuh-indexer/indexer-api.html)
 - Repositório Wazuh Core v4.14.7: [https://github.com/wazuh/wazuh/tree/v4.14.7](https://github.com/wazuh/wazuh/tree/v4.14.7)
 
+#### 2.1.3 Fornecimento do Wazuh ao Cliente e Redistribuição GPLv2 (Decisão D-005)
+
+A **Decisão Registrada do Humano D-005** (`docs/DECISOES-DO-HUMANO.md`) determinou que o Poseidon fornecerá o Wazuh ao cliente, hospedando o Manager e entregando o agente Wazuh aos endpoints. Esta operação constitui **redistribuição de software sob licença GPLv2**, sujeita a sete obrigações estruturais:
+
+1. **Dois artefatos separados, sempre:** O instalador do Poseidon **nunca** empacota o agente Wazuh dentro de si. O `LICENSE` do `wazuh/wazuh` tipifica explicitamente *"includes/integrates Wazuh into a proprietary executable installer"* como obra derivada. A distribuição lado a lado, em instaladores distintos, é mandatória;
+2. **Oferta de código-fonte:** O Poseidon manterá oferta formal do código-fonte para a versão exata do Wazuh distribuída, apontando para a tag correspondente no upstream;
+3. **Preservação de copyright:** Todos os avisos de copyright e o texto integral da GPLv2 são mantidos nos pacotes do Wazuh;
+4. **Sem restrições adicionais:** O EULA do Poseidon não pode restringir o direito do cliente de redistribuir o agente Wazuh;
+5. **Não modificação do agente Wazuh:** O binário distribuído é o oficial do upstream, sem modificações locais que exigiriam abertura de código;
+6. **Zero código derivado no Collector Agent:** O Collector próprio do Poseidon é escrito em Go 1.22+ com zero código derivado do Wazuh, preservando o repositório privado do Poseidon;
+7. **Respeito à marca:** A marca "Wazuh" é de terceiro e nenhuma comunicação deve sugerir endosso ou origem comum.
+
+*Alerta de Horizonte:* O repositório experimental `wazuh/wazuh-agent` (linha 5.x) adota **AGPL-3.0** com cláusula de rede (§13). Qualquer migração futura invalida a análise de GPLv2 e exige novo ADR.
+
 ---
 
 ### 2.2 OCSF vs. ECS: Avaliação Aprofundada contra o OCSF 1.9.0
@@ -206,16 +220,29 @@ Ratificado como OASIS Standard em 10 de Junho de 2021.
 
 ---
 
-### 2.5 AlienVault OTX (Open Threat Exchange)
+### 2.5 CTI Externo: Consulta vs. Acúmulo de Acervo e Restrições Comerciais (Decisão D-004)
 
-- **API REST:** Base URL `https://otx.alienvault.com/api/v1`.
-- **Autenticação:** Cabeçalho HTTP `X-OTX-API-KEY`.
-- **Endpoints:** `GET /api/v1/indicators/IPv4/{ip}/general`, `domain/{domain}/general`, `file/{hash}/general`, e `/api/v1/pulses/subscribed`.
-- **Status do Ecossistema:** O produto migrou para a marca **LevelBlue** e o repositório `OTX-Python-SDK` encontra-se sem commits recentes (desde maio de 2024). O conector CTI do Poseidon consumirá a API REST diretamente com cliente HTTP assíncrono padrão (`httpx`), sem depender do SDK desatualizado.
-- **Termos de Uso:** Uso comunitário com cache local mandatório para evitar abuso de taxa. Limite de taxa de 10.000 req/h citado em fontes secundárias; marcado como `NÃO VERIFICADO` em documentação primária oficial.
+A **Decisão Registrada do Humano D-004** (`docs/DECISOES-DO-HUMANO.md`) estabelece uma diretriz estratégica e jurídica fundamental para o CTI Engine do Poseidon:
+- **O CTI externo é consultado, não acumulado.** O Poseidon não constrói acervo próprio a partir de bases de terceiros (não espelha pulses inteiros do OTX, bancos de hashes ou listas globais de reputação);
+- **Persistência de observações próprias:** O Poseidon persiste unicamente as **próprias observações** (*"consultei o IOC X em T, a fonte S respondeu R"*, e *"vi o IOC X no host Y do cliente Z em T"*), satisfazendo a Lei 7;
+- **Fundamento Estratégico:** O acervo de terceiros é comprável por qualquer concorrente; o histórico correlacionado de avistamentos nos endpoints dos clientes do Poseidon é um ativo único que compõe valor com o tempo.
+
+#### 2.5.1 Restrições Comerciais de Feeds de CTI (Insumo Mandatório do Modelo de Negócio)
+
+Auditoria realizada em 2026-09-20 nos termos de serviço dos provedores de inteligência de ameaças:
+
+| Provedor / Feed | Restrições Identificadas para Produto Comercial / SaaS | Situação no Poseidon |
+|---|---|---|
+| **VirusTotal** (API pública) | *"must not be used in commercial products or services"*; veda republicação e redistribuição. **Exige API premium corporativa paga.** | **Bloqueado no tier gratuito.** Postergado na V1 para clientes que forneçam sua própria chave (BYOK) ou até contratação comercial. |
+| **AbuseIPDB** (plano gratuito) | *"You may not use Free plans for commercial purposes"*. **Exige plano Basic ou superior.** | **Bloqueado no tier gratuito.** Postergado para planos corporativos pagos ou BYOK. |
+| **abuse.ch** (MalwareBazaar / URLhaus / ThreatFox) | Declarado *"100% free for commercial and non-commercial usage"* sob uso justo. Termos de licença de desenvolvedor para API comercial marcados como `NÃO VERIFICADO em detalhe`. | **Adotado na V1** para enriquecimento automatizado sob demanda com rate limit estrito. |
+| **AlienVault OTX / LevelBlue** | Base URL `https://otx.alienvault.com/api/v1`. Não encontrada proibição categórica de uso comercial nos termos gerais. Termos integrais marcados como `NÃO VERIFICADO`. | **Adotado na V1** via API REST direta (`httpx`), com cache transitório em Redis e sem acumular pulses. |
 
 *Fontes oficiais consultadas em 2026-09-20:*
-- OTX Portal & API Documentation: [https://otx.alienvault.com/api/](https://otx.alienvault.com/api/)
+- VirusTotal Terms: [https://docs.virustotal.com/docs/historic-terms-of-service](https://docs.virustotal.com/docs/historic-terms-of-service)
+- AbuseIPDB Legal: [https://www.abuseipdb.com/legal](https://www.abuseipdb.com/legal)
+- abuse.ch FAQ: [https://bazaar.abuse.ch/faq/](https://bazaar.abuse.ch/faq/)
+- OTX API Portal: [https://otx.alienvault.com/api/](https://otx.alienvault.com/api/)
 
 ---
 
@@ -299,6 +326,10 @@ Verificação por afirmação individual (conforme `OBSERVATION-13`):
 | 23| `Microsoft-Windows-Threat-Intelligence` exige PPL Antimalware/ELAM | `learn.microsoft.com/en-us/windows/win32/services/protecting-anti-malware-services` | 2026-09-20 | **VERIFICADO** |
 | 24| Leitura do canal Security exige `SeSecurityPrivilege` | Microsoft Learn Windows Event Log Architecture | 2026-09-20 | **VERIFICADO** |
 | 25| WFP suporta sessões dinâmicas e filtros persistentes | `learn.microsoft.com/en-us/windows/win32/fwp/object-management` | 2026-09-20 | **VERIFICADO** |
+| 26| VirusTotal API pública veda produtos/serviços comerciais | `docs.virustotal.com/docs/historic-terms-of-service` | 2026-09-20 | **VERIFICADO** |
+| 27| AbuseIPDB plano gratuito veda propósitos comerciais | `abuseipdb.com/legal` (Terms of Service) | 2026-09-20 | **VERIFICADO** |
+| 28| abuse.ch declara uso comercial/não-comercial livre sob uso justo | `bazaar.abuse.ch/faq` | 2026-09-20 | **VERIFICADO** |
+| 29| Wazuh LICENSE define integrador proprietário como obra derivada | `github.com/wazuh/wazuh/blob/master/LICENSE` | 2026-09-20 | **VERIFICADO** |
 
 ---
 
@@ -307,6 +338,8 @@ Verificação por afirmação individual (conforme `OBSERVATION-13`):
 1. **Adoção do OCSF 1.9.0 com Extensão `win`:** A normalização de eventos adotará formalmente a classe `detection_finding` (2004) para alertas de terceiros (Wazuh/Defender), `authentication` (3002) para eventos de identidade, e as classes da Categoria 7 (`remediation_activity` 7001 e `network_remediation_activity` 7004) para ações de resposta do Control Plane. Modificações de Registro serão validadas via extensão `win`.
 2. **Telemetria Híbrida sem Sysmon:** O Collector Agent utilizará ETW direto sem CGO para processos, conexões de rede e DNS, complementado pelo Security Event ID 4688 via `wevtapi.dll` para captura auditada da linha de comando, tornando a GPO de linha de comando um requisito mandatório de implantação monitorado pelo Health Center.
 3. **Isolamento de Rede Falha-Fechado Criptográfico:** A expiração do isolamento (Lei 10 v2.1) persiste o próprio objeto assinado da Lei 9. A verificação da assinatura Ed25519 é executada antes da reversão das regras; falha na validação mantém o isolamento e aciona alarme de adulteração. O watchdog opera sobre base de tempo monotônica e a recuperação de emergência é estritamente local (sem canal remoto).
+4. **CTI Consultado, Não Acumulado (Decisão D-004):** O Poseidon não replica acervos de feeds externos; persiste unicamente observações próprias e avistamentos de endpoints (STIX SRO `sighting`). Diante da proibição de uso comercial em tiers gratuitos, VirusTotal e AbuseIPDB exigem planos comerciais pagos e não entram no tier gratuito na V1 (enriquecimento na V1 utiliza abuse.ch e OTX sob demanda, com cache volátil Redis).
+5. **Fornecimento do Wazuh em Dois Artefatos Separados (Decisão D-005):** O instalador do Poseidon jamais empacota o agente Wazuh dentro de si. A entrega aos clientes é realizada através de pacotes de instalação inteiramente distintos e autônomos, cumprindo integralmente as 7 obrigações de redistribuição da GPLv2.
 
 ---
 
