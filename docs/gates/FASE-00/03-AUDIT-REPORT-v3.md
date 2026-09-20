@@ -952,3 +952,485 @@ arquiteturalmente errada e retirei. Perdeu a parte em que generalizou: o SHA-256
 capacidade Sigma, e nenhum modificador da especificação 2.1.0 opera sobre hash. O achado
 segue aberto com escopo novo — medir a taxa de erro da redação — e produziu o `BLOCKER-09`,
 que é mais grave que ele.
+
+---
+---
+
+# ADENDO À RODADA 3 — Decisões D-004 e D-005
+
+**Incorporado em:** 2026-09-20, após a entrega das Partes I a III
+**Base nova:** `docs/DECISOES-DO-HUMANO.md` — precedência igual à da constituição;
+*"Nenhum ADR pode contradizer uma decisão aqui. ADR que dependa de uma delas deve citá-la."*
+
+Este adendo **não reinicia a rodada**. Ele acrescenta os achados que as duas decisões novas
+produzem sobre o material já auditado, e **corrige um ponto da Parte III**: o ADR-003, que
+eu havia classificado como o mais sólido dos oito, deixou de sê-lo — não por defeito próprio,
+mas porque D-004 mudou o que ele deveria decidir.
+
+Numeração contínua: `BLOCKER-12` a `14`, `MAJOR-24` a `27`, `MINOR-12` a `13`,
+`OBSERVATION-17` a `18`. O quadro final deste adendo **substitui** o "Resumo para decisão"
+da Parte III.
+
+---
+
+## Método do adendo
+
+1. Leitura integral do `DECISOES-DO-HUMANO.md`.
+2. Releitura do ADR-001 e do ADR-003 contra D-005 e D-004 — são os dois ADRs que as decisões
+   nomeiam como afetados.
+3. Reavaliação das Leis 8, 11 e 4 sob D-005, procurando o mesmo tipo de defeito de **alcance**
+   que o `BLOCKER-03` encontrou na Lei 8: uma lei que protege o componente que escrevemos e
+   se cala sobre o componente que passamos a operar ou distribuir.
+4. **Verificação em fonte primária das duas linhas marcadas `NÃO VERIFICADO` na tabela do
+   D-004**, porque são elas que sustentam a saída de V1 que a decisão propõe.
+
+---
+
+## Verificação da tabela do D-004 — a linha do abuse.ch precisa de correção
+
+A tabela do D-004 registra:
+
+> **abuse.ch** (MalwareBazaar/URLhaus/ThreatFox) — *Declarado "100% free for commercial and
+> non-commercial usage" sob uso justo. Há menção a licença de desenvolvedor para acesso
+> comercial à API — **NÃO VERIFICADO em detalhe***
+
+Verifiquei em 2026-09-20. **A conclusão operativa da linha está errada**, e isso importa
+porque o abuse.ch é metade da saída de V1 que o D-004 propõe.
+
+**Fonte 1 — `https://bazaar.abuse.ch/api/` (MalwareBazaar), literal:**
+
+> *"This API is available free of charge under the fair use principles. **Use of the API by
+> companies, networks, or individuals with commercial or for-profit needs may require a paid
+> subscription for the enhanced abuse.ch commercial API.**"*
+>
+> *"In order to interact with the MalwareBazaar API, you need to obtain an `Auth-Key` first."*
+
+**Fonte 2 — `https://threatfox.abuse.ch/api/` (ThreatFox):** a mesma frase, palavra por
+palavra, e a mesma exigência de `Auth-Key`.
+
+**Fonte 3 — `https://abuse.ch/terms-of-use/`, que é o documento que governa:**
+
+> *"**Spamhaus Technology Limited** acts as the primary licensee of the abuse.ch datasets."*
+>
+> *"Use of the Platforms by companies, networks, or individuals with commercial or for-profit
+> needs **may require a paid subscription**"* — gratuito para *"not-for-profit purposes"*,
+> e a assinatura comercial *"will be managed by Spamhaus"*.
+
+### O que isso muda
+
+A frase *"100% free for commercial and non-commercial usage"* descreve a licença histórica
+dos **datasets**. Os **Termos de Uso vigentes** colocam o uso comercial atrás de assinatura
+paga gerida pela Spamhaus, que passou a ser a licenciada primária. São coisas diferentes, e
+a que vincula o Poseidon é a segunda.
+
+Ou seja: **o abuse.ch tem exatamente o mesmo portão comercial que desqualificou o
+VirusTotal e o AbuseIPDB.** Mais brando na redação — *"may require"* em vez de
+*"must not be used"* — mas existe, é vendido, e a Spamhaus é quem vende.
+
+Tabela corrigida:
+
+| Fonte | Situação para produto comercial | Verificação |
+|---|---|---|
+| **VirusTotal**, API pública | *"must not be used in commercial products or services"* — **exige premium paga** | do D-004 |
+| **AbuseIPDB**, plano gratuito | *"You may not use Free plans for commercial purposes"* — **exige Basic+** | do D-004 |
+| **abuse.ch** (MalwareBazaar · ThreatFox · URLhaus) | *"may require a paid subscription for the enhanced abuse.ch commercial API"*; **Spamhaus é a licenciada primária**; `Auth-Key` obrigatório | **verificado agora — a linha do D-004 está otimista** |
+| **OTX / LevelBlue** | Sem proibição categórica encontrada. **Termos integrais continuam NÃO VERIFICADOS** | do D-004, não avancei |
+
+### [MAJOR-24] A saída de V1 proposta pelo D-004 repousa sobre as duas únicas linhas que a própria decisão marcou como não verificadas
+
+**Arquivo:** `docs/DECISOES-DO-HUMANO.md` — D-004, "Consequência de roadmap"
+
+O D-004 conclui: *"ou a V1 usa **abuse.ch e OTX**, e os dois primeiros ficam para quando
+houver receita."*
+
+São precisamente as duas linhas `NÃO VERIFICADO` da tabela. A Lei 1 determina que item não
+verificado *"vira pendência aberta, **nunca premissa**"* — e aqui ele virou a premissa do
+plano de V1, num documento com precedência constitucional.
+
+Verificada uma delas, ela enfraquece: o abuse.ch tem portão comercial. Resta o OTX,
+sozinho, com termos integrais ainda não lidos — e o SDK oficial está parado desde 2024-05-09
+e a marca migrou para LevelBlue (`OBSERVATION-02`, rodada 1).
+
+**Cenário de falha.** A Fase 6 é planejada com abuse.ch + OTX como fontes gratuitas. Na
+véspera da primeira venda, a leitura dos termos revela que o abuse.ch exige assinatura
+Spamhaus para uso comercial e que o OTX tem cláusula equivalente. O Poseidon fica sem
+nenhuma fonte de CTI no tier em que foi vendido — que é o mesmo desfecho que o D-004 existe
+para evitar, adiado em uma fase.
+
+**Correção exigida.** Antes de a Fase 6 entrar em planejamento:
+
+1. **Ler os termos integrais do OTX/LevelBlue** e registrá-los no ADR-003, como a Lei 13 já
+   exige (*"Nenhum feed entra em produção sem que seus termos tenham sido lidos e registrados
+   em ADR"*). Esta é a única linha que ainda não tem leitura nenhuma.
+2. **Reclassificar o abuse.ch** na tabela do D-004 com o texto verificado acima, e decidir:
+   assinatura Spamhaus (custo recorrente, como o D-004 já pede para VT/AbuseIPDB), ou uso
+   restrito a datasets cuja licença própria permita uso comercial — o que exige separar
+   **licença do dado** de **termos da API**, distinção que os Termos de Uso do abuse.ch não
+   fazem com clareza e que **não consegui resolver**.
+3. Registrar que **todas as quatro fontes** passaram a exigir credencial (`Auth-Key` no
+   abuse.ch, `X-OTX-API-KEY` no OTX, chave no VT e no AbuseIPDB). Isso põe quatro segredos
+   no escopo do `MAJOR-12`, que segue aberto sem mecanismo de rotação.
+
+**Ressalva de honestidade:** *"may require"* não é *"must not"*. Não afirmo que o uso
+comercial do abuse.ch é proibido — afirmo que ele **não é o caminho livre que a tabela
+descreve**, e que a diferença é material para um plano de V1 que depende dele.
+
+---
+
+## D-004 e o CTI
+
+### [BLOCKER-12] O ADR-003 modela exatamente o acervo de terceiro que o D-004 proíbe acumular
+
+**Arquivo:** `docs/adr/ADR-003.md` §2.1 e §2.2
+**Norma violada:** D-004 (precedência constitucional); Lei 13; dimensões 4.1 e 4.7
+
+Na Parte III eu classifiquei o ADR-003 como o mais sólido dos oito, e mantenho isso **como
+juízo sobre STIX**: o tratamento de `sighting` como SRO, a proveniência obrigatória e o
+modelo híbrido relacional/JSONB continuam corretos. O que mudou é a pergunta que o ADR
+responde.
+
+**Evidência.** O D-004 determina:
+
+> *"O Poseidon **não constrói base própria a partir do acervo de fontes externas** (pulses,
+> listas de IOC, descrições de terceiros). O Poseidon **persiste as próprias observações**."*
+
+O ADR-003 §2.1 cria, no PostgreSQL:
+
+```
+cti_indicators      → SDO indicator      (pattern, valid_from, valid_until, confidence…)
+cti_threat_actors   → SDO threat-actor   (name, aliases, sophistication…)
+cti_malware         → SDO malware        (name, is_family, malware_types, capabilities…)
+cti_relationships   → SRO relationship
+cti_sightings       → SRO sighting
+```
+
+Das cinco, **uma** é observação própria: `cti_sightings`. As outras quatro são o acervo —
+indicadores, atores, famílias de malware e relacionamentos são precisamente *"listas de IOC
+e descrições de terceiros"*. Nenhuma delas descreve um fato que o Poseidon observou.
+
+E o §2.2 é mais direto:
+
+> *"Toda ingestão (seja via OTX, VirusTotal, AbuseIPDB ou feed local) armazena: … **`raw_payload`:
+> Resposta bruta da fonte externa preservada.**"*
+
+Armazenar em definitivo a resposta bruta de todas as fontes é a definição operacional de
+acumular acervo alheio. E colide com a linha do VirusTotal na própria tabela do D-004, que
+proíbe *"republicar/redistribuir material do serviço"* — num produto SaaS, exibir ao cliente
+o `raw_payload` de um terceiro é o caso que essa cláusula descreve.
+
+O ADR-003 também **não cita o D-004**, que o `DECISOES-DO-HUMANO.md` exige de todo ADR que
+dele dependa.
+
+**Cenário de falha.** A Fase 6 implementa o ADR-003 como está. O Poseidon passa a manter uma
+cópia crescente do acervo do OTX e das respostas brutas de VT e AbuseIPDB. Três consequências
+simultâneas: constrói-se o ativo que o D-004 diz não ter valor competitivo; assume-se custo
+de armazenamento e de sincronização de um acervo de terceiro; e cria-se exposição contratual
+com pelo menos uma fonte cujos termos proíbem redistribuição.
+
+**Correção exigida.** Reescrever o §2 do ADR-003 sobre a distinção do D-004:
+
+1. **Fato próprio, persistido em definitivo:**
+   - **Registro de consulta** — *"consultei o IOC X em T, a fonte S respondeu com veredito V,
+     confiança C"*. É evento do Poseidon, não acervo alheio. Precisa de modelo novo; não
+     existe no ADR.
+   - **`cti_sightings`** — *"vi o IOC X no host Y do cliente Z em T"*. Já está, e é a peça
+     que o D-004 chama de ativo que compõe com o tempo.
+2. **Acervo de terceiro, se existir, é cache com TTL e política por fonte**, nunca base —
+   marcado como cache, com origem, expiração e o direito de exibição declarado por fonte. O
+   D-004 fala em política por fonte; o contrato do conector é onde ela mora.
+3. **`raw_payload`** deixa de ser preservação indiscriminada e passa a ter retenção por
+   fonte, governada pelos termos daquela fonte — o que também é exigência da Lei 13 e da
+   LGPD que ela invoca.
+4. Citar o D-004 explicitamente.
+
+### [MAJOR-25] O conector OTX foi pesquisado e modelado no endpoint que o D-004 proíbe como padrão
+
+**Arquivos:** `00-RESEARCH.md` §2.5; `docs/adr/ADR-003.md` §2.2
+
+O `00-RESEARCH.md` §2.5 descreve como capacidade central: *"Feeds de Pulsos Inscritos:
+`GET /api/v1/pulses/subscribed` (**permite ingestão assíncrona de CTI em lotes**)"*. Ingestão
+em lotes de pulses é, literalmente, o acervo que o D-004 nomeia primeiro.
+
+O endpoint compatível com o D-004 é o de consulta por indicador —
+`/api/v1/indicators/{tipo}/{ioc}/{seção}`, com `section='general'` por padrão, que verifiquei
+no código do SDK na rodada 2 e que o Builder documentou corretamente. Esse é o que produz
+*"consultei o IOC X em T"*.
+
+**Correção exigida.** O ADR-003 declara o padrão de acesso por fonte: **consulta sob demanda
+como regra**, ingestão em lote apenas onde a licença da fonte permitir e onde houver razão
+declarada. Isso muda o desenho do conector — de *sincronizador* para *cliente com cache* — e
+muda o dimensionamento da Fase 6, porque consulta sob demanda tem perfil de rate limit
+completamente diferente de sincronização periódica. Os limites reais do OTX continuam
+**NÃO VERIFICADOS** (rodada 1).
+
+### [OBSERVATION-17] O D-004 não fixa a granularidade de "R", e a Lei 5 cobra a diferença
+
+O D-004 manda persistir *"consultei o IOC X em T, a fonte S respondeu **R**"*. Quanto de `R`?
+
+- **`R` = veredito + confiança + proveniência** → fato próprio, sem acervo alheio. Coerente
+  com o D-004 e com a Lei 7.
+- **`R` = resposta íntegra** → é o `raw_payload` do ADR-003, e recai no `BLOCKER-12`.
+
+A Lei 5 empurra para o segundo: ela obriga *"referência ao bruto — ponteiro para o evento
+original preservado"* para todo evento. Se a consulta de CTI é um evento do pipeline, o bruto
+dela é a resposta do terceiro, e preservá-la é acumular.
+
+Não é contradição fatal — a saída é declarar que a resposta de CTI **não é um evento do
+pipeline de ingestão**, e sim um registro de operação com modelo próprio, fora do alcance da
+Lei 5. Mas isso precisa estar escrito, porque hoje as duas leituras são defensáveis e levam a
+modelos de dados incompatíveis. Pertence ao ADR-003.
+
+### [MINOR-12] O §3 da constituição promete conectores que o D-004 condiciona
+
+O diagrama de Arquitetura de Referência lista, no Integration Hub:
+`Wazuh · OTX · VT · AbuseIPDB · MISP`. Com o D-004, VT e AbuseIPDB não entram em tier
+gratuito, e o MISP nunca foi pesquisado por nenhum dos dois papéis. O diagrama é o retrato do
+produto; convém marcar os condicionados.
+
+---
+
+## D-005 e o Wazuh
+
+O D-005 é a decisão de maior alcance arquitetural até agora, porque muda o Wazuh de **fonte
+consumida** para **componente do produto entregue**. O que segue são as consequências que
+nenhum artefato do repositório cobre.
+
+### [BLOCKER-13] A Lei 11 tem o mesmo defeito de alcance que a Lei 8 tinha — e o D-005 o ativa
+
+**Arquivo:** `00-CONSTITUTION.md` — Lei 11, sob D-005 e D-002
+**Lei/dimensão violada:** Lei 11 e Lei 13; dimensões 4.1 e 4.3
+
+**Evidência.** A Lei 8 foi corrigida na emenda 2.0 com esta frase, depois do `BLOCKER-03`:
+
+> *"**Esta lei vale para todo caminho de execução que o Poseidon comanda** — o agente que
+> escrevemos e o agente que comandamos através da API de outro fornecedor. **A proibição é da
+> plataforma, não de um componente.**"*
+
+A Lei 11 não recebeu tratamento equivalente. Ela continua a dizer:
+
+> *"**O Collector** não coleta segredos … Linhas de comando são coletadas mas passam por
+> redação de padrões sensíveis antes do envio."*
+
+"O Collector" é o agente que escrevemos. Sob D-005, o Poseidon passa a **entregar ao endpoint
+do cliente um segundo agente** — o do Wazuh — e a **hospedar o manager que o recebe**. Esse
+agente:
+
+- coleta linha de comando. O `00-RESEARCH.md` §2.1.3 do próprio Builder mostra o alerta do
+  Wazuh com `data.win.eventdata.commandLine` contendo `powershell.exe -enc …`;
+- **não faz redação nenhuma** — não existe redação de credencial no pipeline do Wazuh;
+- entrega tudo ao manager, que sob D-005 roda na **infraestrutura do Poseidon**;
+- e o D-005 **item 5 proíbe modificá-lo**: *"Não modificar o agente Wazuh. Se for modificado,
+  as modificações a ele são GPLv2 e devem ser publicadas."*
+
+**Cenário de falha.** Um administrador do cliente executa
+`net use \\fs01\backup P@ssw0rd /user:CORP\svc_backup`. O Collector do Poseidon reda a
+credencial, conforme a Lei 11. O agente Wazuh, no mesmo endpoint, no mesmo segundo, coleta a
+mesma linha íntegra e a envia ao manager hospedado pelo Poseidon, onde ela é gravada em
+`alerts.json` e indexada em `wazuh-alerts-*`. A credencial do cliente fica em claro na
+infraestrutura do operador. A Lei 11 foi cumprida à risca e o resultado que ela existe para
+impedir aconteceu.
+
+**Impacto.** Este é o `BLOCKER-09` por um segundo caminho, e pior em três aspectos: não há
+redação alguma (contra redação imperfeita), o caminho não pode ser corrigido no agente (item
+5 do D-005), e sob D-002 o custodiante é o operador do SaaS, para todos os clientes. A frase
+da própria Lei 11 — *"Uma plataforma de segurança que agrega credenciais é um alvo, não uma
+defesa"* — descreve o que o D-005 acabou de criar.
+
+**Correção exigida.** A Lei 11 precisa da mesma correção de alcance que a Lei 8 recebeu:
+**a proibição é da plataforma, não do Collector.** Concretamente, e sem violar o item 5 do
+D-005:
+
+1. **Redação na fronteira de ingestão do Wazuh**, no adaptador do Poseidon, **antes** de
+   qualquer persistência no Poseidon. Isso é código do Poseidon, não modificação do Wazuh.
+2. **Configuração do agente Wazuh entregue pelo Poseidon** — configurar não é modificar — para
+   não coletar os canais que duplicam o que o Collector já cobre com redação. Isso resolve
+   `MAJOR-26` junto.
+3. **Retenção mínima e cifrada no manager hospedado**, declarada, porque `alerts.json` e os
+   índices do Wazuh ficam fora do controle do pipeline do Poseidon.
+4. Declarar explicitamente, no ADR-001, que **o Wazuh hospedado é superfície de dado pessoal
+   sob a Lei 13**, com as mesmas obrigações de finalidade, prazo e eliminação.
+
+### [BLOCKER-14] O ADR-001 decide o licenciamento de um produto que o D-005 substituiu
+
+**Arquivo:** `docs/adr/ADR-001.md` §2.3, §4
+**Norma violada:** D-005 (precedência constitucional); dimensões 4.2 e 4.7
+
+O ADR-001 §2.3 decide: **"Consumo Exclusivo via Rede (REST API / Indexer)"**, e conclui, no
+§4: *"**Nenhuma contaminação** por licenças copyleft (`GPLv2` ou `AGPL-3.0`)"*.
+
+O D-005 decide o oposto no fato gerador: *"O Poseidon hospeda o manager e **entrega o agente
+Wazuh aos endpoints do cliente**. Isso é **redistribuição de software GPLv2**."*
+
+O raciocínio do ADR-001 não está errado — consumo por rede de fato não é obra derivada, e o
+`LICENSE` do Wazuh condiciona as restrições a *"if you actually redistribute Wazuh"*. O
+problema é que a condição passou a ser verdadeira. **As sete obrigações do D-005 não existem
+em nenhum artefato do repositório**, e o ADR-001 é onde elas deveriam morar. Ele também não
+cita o D-005.
+
+Falta, item a item do D-005:
+
+| D-005 | Estado no ADR-001 |
+|---|---|
+| 1. Dois artefatos separados; instalador nunca empacota o agente | ausente |
+| 2. Oferta de código-fonte da release exata, apontando o tag upstream | ausente |
+| 3. Preservar avisos de copyright e texto de licença | ausente |
+| 4. EULA do Poseidon sem restrição adicional sobre as partes do Wazuh | ausente |
+| 5. Não modificar o agente Wazuh | ausente |
+| 6. Collector com zero código derivado do Wazuh | implícito, não declarado |
+| 7. Marca: nenhuma sugestão de endosso | ausente |
+
+**Cenário de falha.** O ADR-001 é aprovado como está. A Fase 15 empacota a distribuição, e o
+caminho de menor esforço — um instalador único que instala os dois agentes — é exatamente o
+que o `LICENSE` do Wazuh nomeia: *"Includes/integrates Wazuh into a proprietary executable
+installer"*. O defeito só aparece quando o produto já foi entregue a um cliente.
+
+**Correção exigida.** Reescrever o ADR-001 sobre o D-005: o papel do Wazuh passa a ser
+**fonte consumida e componente redistribuído**, com as sete obrigações como requisitos
+nomeados; incluir as travas do conector da Lei 8 (`MINOR-11`, ainda aberto); registrar o
+alerta de horizonte do AGPL-3.0 na linha 5.x, que o D-005 traz e o ADR-001 não tem; e citar
+D-001 e D-005.
+
+### [MAJOR-26] Dois agentes no mesmo endpoint, sem divisão de trabalho declarada
+
+**Arquivos:** `00-CONSTITUTION.md` §4 e Lei 4; `docs/adr/ADR-005.md`
+
+O D-005 item 1 determina *"dois artefatos separados, sempre"*. A consequência operacional é
+que **o endpoint do cliente passa a ter dois agentes de segurança** — o Collector em Go e o
+agente Wazuh em C — e nenhum documento diz quem coleta o quê.
+
+Consequências não tratadas:
+
+1. **Telemetria duplicada.** Ambos leem o canal `Security` do Windows. O mesmo 4688 é
+   coletado duas vezes, transportado duas vezes, indexado duas vezes. Custo de rede, de
+   armazenamento e de ingestão dobrado no caminho mais volumoso do produto.
+2. **A heterogeneidade da Lei 4 fica em parte ilusória.** A Lei 4 v2.1 justifica os dois
+   corpora como *"duas naturezas diferentes de dado — alerta já interpretado por um motor de
+   terceiro versus telemetria bruta"*. Isso continua verdadeiro para o **alerta** do Wazuh.
+   Mas se o agente Wazuh entregar também eventos brutos dos mesmos canais, parte da segunda
+   fonte é a primeira com outro transporte.
+3. **Correlação e duplicidade.** O pipeline precisa reconhecer que dois eventos de fontes
+   diferentes descrevem o mesmo fato, ou a contagem de eventos e as métricas de detecção
+   ficam infladas. Isso é a dimensão 4.4 — *"reprocessamento duplica?"* — agora por desenho,
+   não por acidente.
+4. **Conflito de recursos e de antivírus.** Dois agentes com driver/serviço privilegiado no
+   mesmo host é fonte conhecida de contenção e de falso positivo mútuo.
+
+**Correção exigida.** O ADR-001 e o ADR-005 declaram a **divisão de responsabilidade de
+coleta**: o que o Collector coleta, o que o agente Wazuh coleta, e a garantia de que não se
+sobrepõem. A recomendação técnica é entregar o agente Wazuh com configuração restrita às
+capacidades que o Collector **não** tem — FIM, SCA, rootcheck, e resposta ativa — e deixar
+os canais de evento do Windows com o Collector, que é o único dos dois que faz redação
+(`BLOCKER-13`). Configurar é permitido; modificar não é.
+
+### [MAJOR-27] As obrigações operacionais do D-005 não têm dono, fase nem processo
+
+**Arquivos:** `00-CONSTITUTION.md` §7 e §10; todos os ADRs
+
+Quatro das sete obrigações do D-005 são **contínuas e por release**, não decisões de projeto,
+e nada no repositório as ancora:
+
+- **Oferta de código-fonte (item 2)** — para *"a release exata distribuída, apontando o tag
+  upstream"*. É obrigação que se renova a cada versão do Wazuh que o Poseidon entregar. Exige
+  processo de release, não parágrafo de ADR. O §10 (Convenções) trata de commits, branches,
+  tags e segredos, e não tem nada sobre distribuição de terceiros.
+- **Preservação de avisos (item 3)** — requisito de empacotamento.
+- **EULA sem restrição adicional (item 4)** — requisito de documento comercial que ainda não
+  existe, e que o próprio D-005 marca para revisão jurídica.
+- **Marca (item 7)** — requisito de comunicação e de interface: se a UI do Poseidon mostra
+  "Wazuh", precisa de atribuição correta.
+
+Some-se uma quinta consequência que o D-005 cria e não nomeia: **o Poseidon passa a operar o
+Wazuh manager**. Toda a superfície que documentei no `BLOCKER-03` — `PUT /active-response`
+com bypass por `!`, `agents_list` com default `'*'`, `PUT /agents/upgrade_custom` — deixa de
+ser API de um terceiro e vira **infraestrutura do próprio Poseidon**, sob D-002, com clientes
+de vários tenants. A Lei 8 disciplina o **cliente** que o Poseidon escreve; ninguém disciplina
+o **servidor** que o Poseidon agora hospeda: quem mais o alcança, como é segmentado, e o que
+impede um tenant de emitir Active Response para agentes de outro.
+
+**Correção exigida.** (a) Fase nomeada para empacotamento e distribuição — a Fase 15 é a
+candidata e hoje não menciona nada disso; (b) entrada no §10 sobre obrigações de
+redistribuição de terceiros, amarrada à tag de release; (c) o hardening do manager hospedado
+entra no escopo da Fase 14, com o modelo de ameaça de multi-tenant que o §11 admite como
+horizonte.
+
+### [MINOR-13] ADR-001 e ADR-003 não citam as decisões de que dependem
+
+O `DECISOES-DO-HUMANO.md` determina: *"ADR que dependa de uma delas deve citá-la."* O ADR-001
+depende de D-001 e D-005; o ADR-003 depende de D-004; o ADR-005 e o ADR-008 dependem de
+D-002; o ADR-006 depende de D-003. **Nenhum dos oito cita nenhuma decisão** — todos são
+anteriores ao documento.
+
+Some-se ao `MINOR-10`: o `TEMPLATE.md` de ADR não tem campo para citar decisões do humano, e
+seu checklist ainda lista doze leis. Enquanto o template não pedir, os próximos ADRs também
+não citarão.
+
+### [OBSERVATION-18] As duas decisões absorveram achados anteriores — registro do que se fechou
+
+Por simetria com o razão da fase:
+
+- O **D-005** incorpora o `OBSERVATION-07` da rodada 1 (agente Wazuh 5.x é AGPL-3.0) como
+  *"Alerta de horizonte"*, com a consequência correta: migrar *"invalida esta análise e exige
+  novo ADR"*. Fechado.
+- O **D-004** vai além do meu `OBSERVATION-02`, que recomendava *"tratar OTX como um provedor
+  atrás do contrato de CTI, nunca como sua fundação"*. A formulação do D-004 — *"o acervo de
+  terceiro é comprável por qualquer concorrente; o histórico de avistamentos dos seus clientes
+  não é"* — é um argumento melhor que o meu, e de produto, não de engenharia. Fechado e
+  superado.
+- O **D-005** também responde, sem nomear, à pergunta que eu havia deixado aberta na rodada 1
+  (§12.1 do `03-AUDIT-RESEARCH.md`): se empacotar o Wazuh contava como redistribuição. A
+  resposta é sim, e o D-005 assume as obrigações em vez de evitá-las. A **ressalva jurídica**
+  que o próprio D-005 traz — *"antes de vender, um advogado precisa ver os itens 1, 4 e 7"* —
+  é a postura correta, e eu não tenho nada a acrescentar a ela porque continua fora da minha
+  competência.
+
+---
+
+## Quadro final da rodada 3 — substitui o "Resumo para decisão" da Parte III
+
+**BLOCKER abertos: 7.**
+
+| ID | Achado | Onde | Origem |
+|---|---|---|---|
+| `BLOCKER-08` | Monotônico não sobrevive ao reboot que a falha-fechado exige | Lei 10, item 4 | emenda v2.1 |
+| `BLOCKER-09` | Lei 5 × Lei 11: o evento bruto carrega a credencial | Leis 5 e 11 | julgamento do `MAJOR-03` |
+| `BLOCKER-10` | ADR-002 reintroduz o envelope revogado; classes OCSF erradas | `ADR-002.md` | ADR desatualizado |
+| `BLOCKER-11` | ADR-006 especifica o failsafe que a Lei 10 v2.1 proíbe | `ADR-006.md` | ADR desatualizado |
+| `BLOCKER-12` | ADR-003 modela o acervo de terceiro que o D-004 proíbe | `ADR-003.md` | **D-004** |
+| `BLOCKER-13` | Lei 11 não alcança o agente Wazuh que o Poseidon passa a entregar | Lei 11 | **D-005** |
+| `BLOCKER-14` | ADR-001 decide o licenciamento de um produto que o D-005 substituiu | `ADR-001.md` | **D-005** |
+
+Quatro dos sete são **ADRs contra a base normativa vigente** — `BLOCKER-10`, `11`, `12`,
+`14`. É um problema com quatro instâncias, não quatro problemas: os oito ADRs foram escritos
+às 10:45–10:47 e desde então houve duas emendas constitucionais e cinco decisões registradas.
+O conserto é uma passada de revisão nos ADRs contra a base atual, não redesenho.
+
+Os outros três exigem decisão nova: `BLOCKER-13` e `BLOCKER-09` são a mesma pergunta por dois
+caminhos — **o Poseidon custodia credenciais dos clientes, e por onde** — e ambos ficaram mais
+sérios sob D-002 e D-005. `BLOCKER-08` é dificuldade técnica genuína com correção proposta.
+
+Ordem que eu recomendaria, revisada:
+
+1. **`BLOCKER-13` + `BLOCKER-09` juntos.** São o mesmo problema — Lei 11 alcança um componente
+   e o produto tem três caminhos de linha de comando (Collector, 4688 bruto, agente Wazuh).
+   Resolver um sem o outro dá falsa sensação de fechamento. Exige emenda, porque a Lei 5 e a
+   Lei 11 estão em conflito no texto vigente e a Lei 11 tem defeito de alcance.
+2. **`BLOCKER-14`, `12`, `11`, `10`** — a passada de revisão dos ADRs. Barata, e enquanto
+   durarem, um "sim" a qualquer um deles desfaz trabalho já decidido.
+3. **`BLOCKER-08`** — correção proposta usa o canal que o isolamento seletivo já garante.
+4. **`MAJOR-24`** — ler os termos do OTX antes de a Fase 6 entrar em planejamento, e corrigir
+   a linha do abuse.ch no D-004. É o item mais barato da lista e destrava uma decisão de custo.
+
+### Não verificado neste adendo
+
+- **Termos integrais do OTX/LevelBlue.** Não avancei além do que o D-004 já registrava.
+- **Licença dos datasets do abuse.ch separada dos termos da API.** Os Termos de Uso não fazem
+  a distinção com clareza e eu **não consegui resolvê-la**. Se o dado for CC0 e só o acesso
+  pela API for comercial, existe um caminho por download em lote — mas isso é exatamente o
+  acervo que o D-004 proíbe acumular, então o caminho pode ser fechado pela decisão, não pela
+  licença.
+- **MISP** — citado no §3 da constituição, nunca pesquisado por nenhum dos dois papéis.
+- **Nada jurídico.** Li texto de licença e de termos de uso. O D-005 já registra que os itens
+  1, 4 e 7 precisam de advogado, e concordo — acrescento que a linha do abuse.ch e a do VT
+  merecem a mesma leitura antes de qualquer venda.
+- **Comportamento real de dois agentes no mesmo endpoint** (`MAJOR-26`): descrevi as
+  consequências; não testei contenção, conflito de driver nem duplicidade em VM.
