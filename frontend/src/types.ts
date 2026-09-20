@@ -478,3 +478,84 @@ export interface TechniqueDetailResponse {
   correlated_actors: Record<string, any>[];
 }
 
+// Phase 6: CTI Investigations & STIX/MISP Export
+export type CaseStatus = 'DRAFT' | 'OPEN' | 'IN_REVIEW' | 'CLOSED' | 'ARCHIVED';
+export type CasePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface EntityReference {
+  entity_type: string;
+  entity_id: string;
+  role: string;
+  label?: string;
+  added_at?: string;
+}
+
+export interface CaseNote {
+  id: string;
+  case_id: string;
+  analyst_id?: string | null;
+  analyst_email?: string | null;
+  content: string;
+  epistemic_classification: EpistemicClassification;
+  created_at: string;
+}
+
+export interface InvestigationCase {
+  id: string;
+  case_number: string;
+  title: string;
+  description: string;
+  status: CaseStatus;
+  priority: CasePriority;
+  tlp: TLP;
+  lead_analyst_id?: string | null;
+  entity_references: EntityReference[];
+  findings_markdown: string;
+  tags: string[];
+  attributes: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  closed_at?: string | null;
+  notes: CaseNote[];
+}
+
+export interface InvestigationListResponse {
+  items: InvestigationCase[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CreateCaseRequest {
+  title: string;
+  description?: string;
+  priority?: CasePriority;
+  tlp?: TLP;
+  tags?: string[];
+  entity_references?: EntityReference[];
+  findings_markdown?: string;
+}
+
+export interface UpdateCaseRequest {
+  title?: string;
+  description?: string;
+  status?: CaseStatus;
+  priority?: CasePriority;
+  tlp?: TLP;
+  tags?: string[];
+  findings_markdown?: string;
+}
+
+export interface AddEntityRequest {
+  entity_type: string;
+  entity_id: string;
+  role?: string;
+  label?: string;
+}
+
+export interface AddNoteRequest {
+  content: string;
+  epistemic_classification?: EpistemicClassification;
+}
+
+

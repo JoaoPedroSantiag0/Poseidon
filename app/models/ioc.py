@@ -93,6 +93,12 @@ class CanonicalIOC(Base, TimestampedModel):
         order_by="desc(IOCLifecycleAudit.created_at)",
     )
 
+    @property
+    def value(self) -> str:
+        """Convenience alias for normalized_value."""
+        return self.normalized_value
+
+
 
 class RawSourceRecord(Base):
     """Immutable data lineage record of intelligence ingested from an external or internal source."""

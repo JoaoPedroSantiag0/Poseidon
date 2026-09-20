@@ -1,14 +1,20 @@
 import type {
+  AddEntityRequest,
+  AddNoteRequest,
   AuditLog,
   Campaign,
   CampaignListResponse,
   CanonicalIOC,
+  CaseNote,
   CorrelationTriggerResponse,
+  CreateCaseRequest,
   CreateRelationshipRequest,
   GraphData,
   IOCDetail,
   IOCIngestPayload,
   IOCListResponse,
+  InvestigationCase,
+  InvestigationListResponse,
   MalwareFamily,
   MalwareFamilyListResponse,
   MitreMatrixResponse,
@@ -21,6 +27,7 @@ import type {
   ThreatActor,
   ThreatActorListResponse,
   TokenResponse,
+  UpdateCaseRequest,
   User,
   Vulnerability,
   VulnerabilityListResponse,
@@ -440,5 +447,76 @@ export const api = {
       method: 'POST',
     });
   },
+
+  // --- Phase 6: CTI Investigations & STIX/MISP Export ---
+  listInvestigations: (params?: {
+    status?: string;
+    priority?: string;
+    q?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<InvestigationListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.priority) searchParams.set('priority', params.priority);
+    if (params?.q) searchParams.set('q', params.q);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<InvestigationListResponse>(`/investigations${query}`);
+  },
+
+  getInvestigation: (id: string): Promise<InvestigationCase> => {
+    return request<InvestigationCase>(`/investigations/${id}`);
+  },
+
+  createInvestigation: (payload: CreateCaseRequest): Promise<InvestigationCase> => {
+    return request<InvestigationCase>('/investigations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateInvestigation: (id: string, payload: UpdateCaseRequest): Promise<InvestigationCase> => {
+    return request<InvestigationCase>(`/investigations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteInvestigation: (id: string): Promise<{ status: string; message: string }> => {
+    return request<{ status: string; message: string }>(`/investigations/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  linkEntityToInvestigation: (caseId: string, payload: AddEntityRequest): Promise<InvestigationCase> => {
+    return request<InvestigationCase>(`/investigations/${caseId}/entities`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  unlinkEntityFromInvestigation: (caseId: string, entityId: string): Promise<InvestigationCase> => {
+    return request<InvestigationCase>(`/investigations/${caseId}/entities/${entityId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  addInvestigationNote: (caseId: string, payload: AddNoteRequest): Promise<CaseNote> => {
+    return request<CaseNote>(`/investigations/${caseId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  exportInvestigationSTIX: (caseId: string): Promise<Record<string, any>> => {
+    return request<Record<string, any>>(`/investigations/${caseId}/export/stix`);
+  },
+
+  exportInvestigationMISP: (caseId: string): Promise<Record<string, any>> => {
+    return request<Record<string, any>>(`/investigations/${caseId}/export/misp`);
+  },
 };
+
 

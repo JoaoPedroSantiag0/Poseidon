@@ -7,6 +7,7 @@ import type { Source, User } from './types';
 import { AuditView } from './views/AuditView';
 import { DashboardView } from './views/DashboardView';
 import { GraphView } from './views/GraphView';
+import { InvestigationsView } from './views/InvestigationsView';
 import { IOCView } from './views/IOCView';
 import { LoginView } from './views/LoginView';
 import { MalwareView } from './views/MalwareView';
@@ -175,6 +176,19 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'investigations' && (
+            <InvestigationsView
+              onNavigateToGraph={(seedId) => {
+                setSelectedGraphIOCId(seedId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+            />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -190,6 +204,7 @@ export const App: React.FC = () => {
             'actors',
             'malware',
             'vulnerabilities',
+            'investigations',
             'sources',
             'sources-settings',
             'audit',

@@ -12,6 +12,8 @@ from app.models.entities import (
 from app.models.enums import (
     TLP,
     AssertionType,
+    CasePriority,
+    CaseStatus,
     ConfidenceLevel,
     EpistemicClassification,
     IOCStatus,
@@ -21,6 +23,7 @@ from app.models.enums import (
     SourceHealthStatus,
     UserRole,
 )
+from app.models.investigation import CaseNote, InvestigationCase
 from app.models.ioc import CanonicalIOC, IOCLifecycleAudit, NormalizedEvidence, RawSourceRecord
 from app.models.relationship import CanonicalRelationship, compute_relationship_hash
 from app.models.source import SourceRegistry
@@ -35,9 +38,13 @@ __all__ = [
     "Campaign",
     "CanonicalIOC",
     "CanonicalRelationship",
+    "CaseNote",
+    "CasePriority",
+    "CaseStatus",
     "compute_relationship_hash",
     "ConfidenceLevel",
     "EpistemicClassification",
+    "InvestigationCase",
     "IOCLifecycleAudit",
     "IOCStatus",
     "IOCType",

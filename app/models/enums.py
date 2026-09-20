@@ -123,3 +123,19 @@ class TLP(str, Enum):
     AMBER_STRICT = "AMBER+STRICT"
     RED = "RED"
 
+
+class CaseStatus(str, Enum):
+    DRAFT = "DRAFT"
+    OPEN = "OPEN"
+    IN_REVIEW = "IN_REVIEW"
+    CLOSED = "CLOSED"
+    ARCHIVED = "ARCHIVED"
+
+
+class CasePriority(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
