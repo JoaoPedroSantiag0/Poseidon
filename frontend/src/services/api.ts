@@ -24,6 +24,11 @@ import type {
   InvestigationListResponse,
   MalwareFamily,
   MalwareFamilyListResponse,
+  MispConnectionTestRequest,
+  MispConnectionTestResponse,
+  MispPullRequest,
+  MispPullResponse,
+  MispPushResponse,
   MitreMatrixResponse,
   PAP,
   ParseTextRequest,
@@ -39,6 +44,8 @@ import type {
   ReportType,
   ResurgenceInsight,
   Source,
+  TaxiiCollection,
+  TaxiiDiscovery,
   TechniqueDetailResponse,
   ThreatActor,
   ThreatActorListResponse,
@@ -722,6 +729,49 @@ export const api = {
         entity_type: entityType,
         entity_id: entityId,
       }),
+    });
+  },
+
+  // --- Layer 2: OASIS TAXII 2.1 Server & Live MISP Sync ---
+  getTaxiiDiscovery: (): Promise<TaxiiDiscovery> => {
+    return request<TaxiiDiscovery>('/taxii2/');
+  },
+
+  getTaxiiCollections: (): Promise<{ collections: TaxiiCollection[] }> => {
+    return request<{ collections: TaxiiCollection[] }>('/taxii2/root/collections/');
+  },
+
+  testMispConnection: (payload: MispConnectionTestRequest): Promise<MispConnectionTestResponse> => {
+    return request<MispConnectionTestResponse>('/misp/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  pullMispEvents: (payload: MispPullRequest): Promise<MispPullResponse> => {
+    return request<MispPullResponse>('/misp/pull', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  pushCaseToMisp: (
+    caseId: string,
+    payload?: { target_url?: string; target_api_key?: string }
+  ): Promise<MispPushResponse> => {
+    return request<MispPushResponse>(`/misp/push/case/${caseId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  pushReportToMisp: (
+    reportId: string,
+    payload?: { target_url?: string; target_api_key?: string }
+  ): Promise<MispPushResponse> => {
+    return request<MispPushResponse>(`/misp/push/report/${reportId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
     });
   },
 };

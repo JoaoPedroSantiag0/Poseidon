@@ -20,6 +20,7 @@ import {
   BookOpen,
   Send,
   Sparkles,
+  Share2,
 } from 'lucide-react';
 import { EmptyState, ErrorState, Skeleton } from '../components/ui';
 import { api } from '../services/api';
@@ -96,6 +97,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [activeReport, setActiveReport] = useState<Report | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isCompileModalOpen, setIsCompileModalOpen] = useState(false);
+  const [isPushingMisp, setIsPushingMisp] = useState(false);
 
   // Cases for compilation
   const [cases, setCases] = useState<InvestigationCase[]>([]);
@@ -296,6 +298,18 @@ Adversaries execute unauthenticated arbitrary code via crafted HTTP POST request
 ## 3. Immediate Containment Checklist
 1. Restrict administrative management access to internal VPN.
 2. Apply vendor emergency hotfix immediately.`);
+    }
+  };
+
+  const handlePushToMisp = async (rep: Report) => {
+    setIsPushingMisp(true);
+    try {
+      const res = await api.pushReportToMisp(rep.id);
+      alert(`MISP Live Synchronization Success!\n\n${res.message}\nEvent URL: ${res.event_url || 'N/A'}`);
+    } catch (err: any) {
+      alert(`Failed to push bulletin to MISP: ${err?.message || err}`);
+    } finally {
+      setIsPushingMisp(false);
     }
   };
 
@@ -676,6 +690,16 @@ Adversaries execute unauthenticated arbitrary code via crafted HTTP POST request
                   <FileCode className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Markdown</span>
                 </a>
+
+                <button
+                  onClick={() => handlePushToMisp(activeReport)}
+                  disabled={isPushingMisp}
+                  className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1 px-2 disabled:opacity-50"
+                  title="Push Bulletin to Remote MISP Instance"
+                >
+                  <Share2 className={`w-3.5 h-3.5 ${isPushingMisp ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Push MISP</span>
+                </button>
 
                 <button
                   onClick={() => setActiveReport(null)}

@@ -362,3 +362,21 @@ def compute_payload_sha256(payload: str | bytes) -> str:
     else:
         data = payload
     return hashlib.sha256(data).hexdigest()
+
+
+class NormalizerService:
+    """Convenience class wrapper for IOC normalization engine."""
+
+    remove_defanging = staticmethod(remove_defanging)
+    normalize_ipv4 = staticmethod(normalize_ipv4)
+    normalize_ipv6 = staticmethod(normalize_ipv6)
+    normalize_domain = staticmethod(normalize_domain)
+    normalize_url = staticmethod(normalize_url)
+    normalize_hash = staticmethod(normalize_hash)
+    normalize_cve = staticmethod(normalize_cve)
+    normalize_asn = staticmethod(normalize_asn)
+    normalize_email = staticmethod(normalize_email)
+    detect_and_normalize = staticmethod(detect_and_normalize)
+    compute_canonical_hash = staticmethod(compute_canonical_hash)
+    compute_payload_sha256 = staticmethod(compute_payload_sha256)
+

@@ -10,9 +10,11 @@ from app.api.v1.graph import router as graph_router
 from app.api.v1.health import router as health_router
 from app.api.v1.investigations import router as investigations_router
 from app.api.v1.iocs import router as iocs_router
+from app.api.v1.misp import router as misp_router
 from app.api.v1.mitre import router as mitre_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.sources import router as sources_router
+from app.api.v1.taxii import router as taxii_router
 from app.api.v1.timeline import router as timeline_router
 
 api_router = APIRouter()
@@ -29,4 +31,6 @@ api_router.include_router(mitre_router, prefix="/mitre", tags=["MITRE ATT&CK Mat
 api_router.include_router(investigations_router, prefix="/investigations", tags=["CTI Investigations & Case Management"])
 api_router.include_router(reports_router, prefix="/reports", tags=["Strategic Intelligence Bulletins & Reports"])
 api_router.include_router(ai_analyst_router, prefix="/ai", tags=["Assistive AI Threat Analyst"])
+api_router.include_router(taxii_router, prefix="/taxii2", tags=["OASIS TAXII 2.1 Exchange"])
+api_router.include_router(misp_router, tags=["MISP Live Synchronization"])
 api_router.include_router(audit_router)

@@ -844,3 +844,71 @@ export interface AIEngineStatusResponse {
   zero_hallucination_guardrail_active: boolean;
 }
 
+// Layer 2: TAXII 2.1 and MISP Live Sync Types
+export interface TaxiiDiscovery {
+  title: string;
+  description?: string | null;
+  contact?: string | null;
+  default?: string | null;
+  api_roots: string[];
+}
+
+export interface TaxiiCollection {
+  id: string;
+  title: string;
+  description?: string | null;
+  alias?: string | null;
+  can_read: boolean;
+  can_write: boolean;
+  media_types: string[];
+}
+
+export interface MispConnectionTestRequest {
+  url?: string | null;
+  api_key?: string | null;
+  verify_ssl?: boolean;
+}
+
+export interface MispConnectionTestResponse {
+  connected: boolean;
+  version?: string | null;
+  py_misp_compatible: boolean;
+  latency_ms?: number | null;
+  message: string;
+}
+
+export interface MispPullRequest {
+  limit?: number;
+  last_days?: number;
+  tags?: string[];
+  enforce_warninglist?: boolean;
+  dry_run?: boolean;
+  source_url?: string | null;
+  source_api_key?: string | null;
+}
+
+export interface MispPullResponse {
+  events_processed: number;
+  attributes_extracted: number;
+  iocs_created: number;
+  iocs_updated: number;
+  sightings_recorded: number;
+  actors_mapped: number;
+  malware_mapped: number;
+  details: {
+    event_id: string;
+    info: string;
+    attributes_count: number;
+  }[];
+}
+
+export interface MispPushResponse {
+  success: boolean;
+  event_id?: string | null;
+  event_uuid?: string | null;
+  event_url?: string | null;
+  attributes_count: number;
+  message: string;
+}
+
+

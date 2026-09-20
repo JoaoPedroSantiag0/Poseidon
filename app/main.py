@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.api.v1.taxii import router as taxii_router
 from app.core.config import settings
 from app.core.errors import ErrorCode, PoseidonException, format_error_response
 from app.core.middleware import CorrelationIdMiddleware
@@ -49,6 +50,9 @@ app.add_middleware(
 
 # Include Core API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Root-level TAXII 2.1 discovery endpoint (standard OASIS path)
+app.include_router(taxii_router, prefix="/taxii2")
 
 
 @app.get("/", tags=["Root"])

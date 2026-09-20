@@ -22,6 +22,104 @@ class StixExportService:
         return f"{prefix}--{generated}"
 
     @classmethod
+    def serialize_canonical_ioc(cls, ioc: CanonicalIOC) -> list[dict[str, Any]]:
+        """Serialize a single CanonicalIOC into STIX 2.1 SCO and Indicator SDO."""
+        stix_objects: list[dict[str, Any]] = []
+        itype = ioc.ioc_type.value if hasattr(ioc.ioc_type, "value") else str(ioc.ioc_type)
+        pattern = ""
+        sco_obj: dict[str, Any] | None = None
+
+        if itype == "ipv4":
+            sco_id = cls._deterministic_uuid("ipv4-addr", ioc.value)
+            sco_obj = {"type": "ipv4-addr", "id": sco_id, "spec_version": "2.1", "value": ioc.value}
+            pattern = f"[ipv4-addr:value = '{ioc.value}']"
+        elif itype == "ipv6":
+            sco_id = cls._deterministic_uuid("ipv6-addr", ioc.value)
+            sco_obj = {"type": "ipv6-addr", "id": sco_id, "spec_version": "2.1", "value": ioc.value}
+            pattern = f"[ipv6-addr:value = '{ioc.value}']"
+        elif itype in ["domain", "fqdn"]:
+            sco_id = cls._deterministic_uuid("domain-name", ioc.value)
+            sco_obj = {"type": "domain-name", "id": sco_id, "spec_version": "2.1", "value": ioc.value}
+            pattern = f"[domain-name:value = '{ioc.value}']"
+        elif itype == "url":
+            sco_id = cls._deterministic_uuid("url", ioc.value)
+            sco_obj = {"type": "url", "id": sco_id, "spec_version": "2.1", "value": ioc.value}
+            pattern = f"[url:value = '{ioc.value}']"
+        elif "hash" in itype:
+            algo = "SHA-256" if "sha256" in itype else ("MD5" if "md5" in itype else "SHA-1")
+            sco_id = cls._deterministic_uuid("file", ioc.value)
+            sco_obj = {"type": "file", "id": sco_id, "spec_version": "2.1", "hashes": {algo: ioc.value}}
+            pattern = f"[file:hashes.'{algo}' = '{ioc.value}']"
+
+        if sco_obj:
+            stix_objects.append(sco_obj)
+
+        indicator_id = f"indicator--{ioc.id}"
+        indicator_sdo = {
+            "type": "indicator",
+            "id": indicator_id,
+            "spec_version": "2.1",
+            "created": ioc.first_seen.isoformat(),
+            "modified": ioc.last_seen.isoformat(),
+            "name": f"Observable: {ioc.value}",
+            "description": f"POSEIDON IOC ({itype}) with risk score {ioc.risk_score}/100",
+            "pattern": pattern or f"[{itype}:value = '{ioc.value}']",
+            "pattern_type": "stix",
+            "valid_from": ioc.first_seen.isoformat(),
+            "confidence": int(ioc.confidence_score),
+            "indicator_types": ["malicious-activity"],
+            "labels": ioc.tags or [],
+            "x_poseidon_risk_score": ioc.risk_score,
+            "x_poseidon_epistemic_classification": (
+                ioc.epistemic_classification.value
+                if hasattr(ioc.epistemic_classification, "value")
+                else str(ioc.epistemic_classification)
+            ),
+            "x_poseidon_status": (
+                ioc.status.value if hasattr(ioc.status, "value") else str(ioc.status)
+            ),
+        }
+        stix_objects.append(indicator_sdo)
+        return stix_objects
+
+    @classmethod
+    def serialize_threat_actor(cls, actor: ThreatActor) -> dict[str, Any]:
+        """Serialize a ThreatActor into a STIX 2.1 threat-actor SDO."""
+        return {
+            "type": "threat-actor",
+            "id": f"threat-actor--{actor.id}",
+            "spec_version": "2.1",
+            "created": actor.created_at.isoformat(),
+            "modified": actor.updated_at.isoformat(),
+            "name": actor.name,
+            "aliases": actor.aliases or [],
+            "description": actor.description or "",
+            "threat_actor_types": actor.threat_actor_types or ["cybercrime"],
+            "primary_motivation": actor.primary_motivation or "financial-gain",
+            "sophistication": actor.sophistication or "intermediate",
+            "resource_level": actor.resource_level or "organization",
+            "confidence": int(actor.confidence),
+            "country": actor.origin_country,
+        }
+
+    @classmethod
+    def serialize_malware_family(cls, mal: MalwareFamily) -> dict[str, Any]:
+        """Serialize a MalwareFamily into a STIX 2.1 malware SDO."""
+        return {
+            "type": "malware",
+            "id": f"malware--{mal.id}",
+            "spec_version": "2.1",
+            "created": mal.created_at.isoformat(),
+            "modified": mal.updated_at.isoformat(),
+            "name": mal.name,
+            "is_family": mal.is_family,
+            "aliases": mal.aliases or [],
+            "description": mal.description or "",
+            "malware_types": mal.malware_types or ["trojan"],
+            "architecture_execution_envs": mal.target_platforms or [],
+        }
+
+    @classmethod
     async def export_case_as_stix_bundle(
         cls,
         session: AsyncSession,

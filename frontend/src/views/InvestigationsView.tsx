@@ -61,6 +61,7 @@ export const InvestigationsView: React.FC<InvestigationsViewProps> = ({
   const [linkEntityId, setLinkEntityId] = useState('');
   const [linkEntityRole, setLinkEntityRole] = useState('observable');
   const [isLinking, setIsLinking] = useState(false);
+  const [isPushingMISP, setIsPushingMISP] = useState(false);
 
   // Create Case Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -250,6 +251,19 @@ export const InvestigationsView: React.FC<InvestigationsViewProps> = ({
       handleDownloadExport(event, `${selectedCase.case_number}_misp_event.json`);
     } catch (err: any) {
       alert(`MISP Export failed: ${err.message}`);
+    }
+  };
+
+  const handlePushToMISP = async () => {
+    if (!selectedCase) return;
+    setIsPushingMISP(true);
+    try {
+      const res = await api.pushCaseToMisp(selectedCase.id);
+      alert(`MISP Live Synchronization Success!\n\n${res.message}\nEvent URL: ${res.event_url || 'N/A'}`);
+    } catch (err: any) {
+      alert(`MISP Push Failed: ${err.message}`);
+    } finally {
+      setIsPushingMISP(false);
     }
   };
 
@@ -570,6 +584,16 @@ export const InvestigationsView: React.FC<InvestigationsViewProps> = ({
                 >
                   <Share2 className="w-3.5 h-3.5" />
                   MISP Event
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePushToMISP}
+                  disabled={isPushingMISP}
+                  className="px-2.5 py-1 bg-poseidon-elevated hover:bg-poseidon-border border border-poseidon-border rounded text-emerald-400 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  title="Publish case directly to remote MISP instance"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isPushingMISP ? 'animate-spin' : ''}`} />
+                  Push to MISP
                 </button>
               </div>
 

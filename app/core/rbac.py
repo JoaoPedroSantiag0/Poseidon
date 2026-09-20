@@ -15,6 +15,9 @@ PERM_STIX_EXPORT = "stix:export"
 PERM_REPORT_READ = "report:read"
 PERM_REPORT_WRITE = "report:write"
 PERM_AI_QUERY = "ai:query"
+PERM_TAXII_READ = "taxii:read"
+PERM_TAXII_WRITE = "taxii:write"
+PERM_MISP_SYNC = "misp:sync"
 
 # Role to Permissions Mapping
 ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
@@ -31,6 +34,9 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_REPORT_READ,
         PERM_REPORT_WRITE,
         PERM_AI_QUERY,
+        PERM_TAXII_READ,
+        PERM_TAXII_WRITE,
+        PERM_MISP_SYNC,
     },
     UserRole.CTI_ANALYST: {
         PERM_IOC_READ,
@@ -43,6 +49,9 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_REPORT_READ,
         PERM_REPORT_WRITE,
         PERM_AI_QUERY,
+        PERM_TAXII_READ,
+        PERM_TAXII_WRITE,
+        PERM_MISP_SYNC,
     },
     UserRole.THREAT_HUNTER: {
         PERM_IOC_READ,
@@ -54,6 +63,9 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_REPORT_READ,
         PERM_REPORT_WRITE,
         PERM_AI_QUERY,
+        PERM_TAXII_READ,
+        PERM_TAXII_WRITE,
+        PERM_MISP_SYNC,
     },
     UserRole.SOC_ANALYST: {
         PERM_IOC_READ,
@@ -62,6 +74,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_STIX_EXPORT,
         PERM_REPORT_READ,
         PERM_AI_QUERY,
+        PERM_TAXII_READ,
     },
     UserRole.VIEWER: {
         PERM_IOC_READ,
@@ -73,6 +86,8 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_ENRICH_EXECUTE,
         PERM_STIX_EXPORT,
         PERM_REPORT_READ,
+        PERM_TAXII_READ,
+        PERM_TAXII_WRITE,
     },
 }
 

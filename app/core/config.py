@@ -54,5 +54,19 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str | None = os.getenv("OLLAMA_BASE_URL")
     AI_MODEL_NAME: str = os.getenv("POSEIDON_AI_MODEL", "gemini-1.5-pro")
 
+    # TAXII 2.1 Server Settings
+    TAXII_SERVER_TITLE: str = os.getenv("TAXII_SERVER_TITLE", "POSEIDON TAXII 2.1 Server")
+    TAXII_SERVER_DESCRIPTION: str = os.getenv(
+        "TAXII_SERVER_DESCRIPTION", "Enterprise Cyber Threat Intelligence Exchange Node"
+    )
+    TAXII_SERVER_CONTACT: str = os.getenv("TAXII_SERVER_CONTACT", "soc-cti@poseidon.sec")
+    TAXII_DEFAULT_API_ROOT: str = os.getenv("TAXII_DEFAULT_API_ROOT", "root")
+    TAXII_MAX_CONTENT_LENGTH: int = int(os.getenv("TAXII_MAX_CONTENT_LENGTH", "10485760"))
+
+    # Live MISP Integration Settings
+    MISP_DEFAULT_URL: str = os.getenv("MISP_DEFAULT_URL", "")
+    MISP_DEFAULT_API_KEY: str = os.getenv("MISP_DEFAULT_API_KEY", "")
+    MISP_VERIFY_SSL: bool = os.getenv("MISP_VERIFY_SSL", "true").lower() in ("true", "1")
+
 
 settings = Settings()
