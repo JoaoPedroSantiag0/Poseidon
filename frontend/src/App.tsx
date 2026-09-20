@@ -14,6 +14,7 @@ import { LoginView } from './views/LoginView';
 import { MalwareView } from './views/MalwareView';
 import { MitreView } from './views/MitreView';
 import { PlaceholderView } from './views/PlaceholderView';
+import { ReportsView } from './views/ReportsView';
 import { SourcesView } from './views/SourcesView';
 import { ThreatActorsView } from './views/ThreatActorsView';
 import { TimelineView } from './views/TimelineView';
@@ -223,6 +224,22 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'reports' && (
+            <ReportsView
+              onNavigateToGraph={(seedId) => {
+                setSelectedGraphIOCId(seedId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+              onNavigateToInvestigation={() => {
+                setCurrentTab('investigations');
+              }}
+            />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -241,6 +258,7 @@ export const App: React.FC = () => {
             'investigations',
             'enrichment',
             'timeline',
+            'reports',
             'sources',
             'sources-settings',
             'audit',

@@ -12,6 +12,8 @@ PERM_RISK_OVERRIDE = "risk:override"
 PERM_SOURCE_CONFIG = "source:config"
 PERM_AUDIT_READ = "audit:read"
 PERM_STIX_EXPORT = "stix:export"
+PERM_REPORT_READ = "report:read"
+PERM_REPORT_WRITE = "report:write"
 
 # Role to Permissions Mapping
 ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
@@ -25,6 +27,8 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_SOURCE_CONFIG,
         PERM_AUDIT_READ,
         PERM_STIX_EXPORT,
+        PERM_REPORT_READ,
+        PERM_REPORT_WRITE,
     },
     UserRole.CTI_ANALYST: {
         PERM_IOC_READ,
@@ -34,6 +38,8 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_INVESTIGATION_WRITE,
         PERM_RISK_OVERRIDE,
         PERM_STIX_EXPORT,
+        PERM_REPORT_READ,
+        PERM_REPORT_WRITE,
     },
     UserRole.THREAT_HUNTER: {
         PERM_IOC_READ,
@@ -42,21 +48,26 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_INVESTIGATION_READ,
         PERM_INVESTIGATION_WRITE,
         PERM_STIX_EXPORT,
+        PERM_REPORT_READ,
+        PERM_REPORT_WRITE,
     },
     UserRole.SOC_ANALYST: {
         PERM_IOC_READ,
         PERM_ENRICH_EXECUTE,
         PERM_INVESTIGATION_READ,
         PERM_STIX_EXPORT,
+        PERM_REPORT_READ,
     },
     UserRole.VIEWER: {
         PERM_IOC_READ,
         PERM_INVESTIGATION_READ,
+        PERM_REPORT_READ,
     },
     UserRole.API_CLIENT: {
         PERM_IOC_READ,
         PERM_ENRICH_EXECUTE,
         PERM_STIX_EXPORT,
+        PERM_REPORT_READ,
     },
 }
 

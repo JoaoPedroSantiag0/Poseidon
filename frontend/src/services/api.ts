@@ -21,12 +21,18 @@ import type {
   MalwareFamily,
   MalwareFamilyListResponse,
   MitreMatrixResponse,
+  PAP,
   ParseTextRequest,
   ParseTextResponse,
   PathFindingResult,
   RawSourceRecord,
   Relationship,
   RelationshipListResponse,
+  Report,
+  ReportCreatePayload,
+  ReportListResponse,
+  ReportStatus,
+  ReportType,
   ResurgenceInsight,
   Source,
   TechniqueDetailResponse,
@@ -584,6 +590,95 @@ export const api = {
     return request<TimelineQueryResponse>(
       `/timeline/entity/${entityType}/${entityId}?page=${page}&page_size=${pageSize}`
     );
+  },
+
+  // Phase 9: Strategic Intelligence Bulletins & Reports
+  listReports: (params: {
+    report_type?: ReportType;
+    status?: ReportStatus;
+    tlp?: string;
+    sector?: string;
+    search?: string;
+    page?: number;
+    page_size?: number;
+  } = {}): Promise<ReportListResponse> => {
+    const sp = new URLSearchParams();
+    if (params.report_type) sp.append('report_type', params.report_type);
+    if (params.status) sp.append('status', params.status);
+    if (params.tlp) sp.append('tlp', params.tlp);
+    if (params.sector) sp.append('sector', params.sector);
+    if (params.search) sp.append('search', params.search);
+    if (params.page) sp.append('page', params.page.toString());
+    if (params.page_size) sp.append('page_size', params.page_size.toString());
+    const qs = sp.toString();
+    return request<ReportListResponse>(`/reports${qs ? `?${qs}` : ''}`);
+  },
+
+  getReport: (reportId: string): Promise<Report> => {
+    return request<Report>(`/reports/${reportId}`);
+  },
+
+  createReport: (payload: ReportCreatePayload): Promise<Report> => {
+    return request<Report>('/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateReport: (reportId: string, payload: Partial<ReportCreatePayload>): Promise<Report> => {
+    return request<Report>(`/reports/${reportId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteReport: (reportId: string): Promise<{ status: string; report_id: string }> => {
+    return request<{ status: string; report_id: string }>(`/reports/${reportId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  publishReport: (reportId: string): Promise<Report> => {
+    return request<Report>(`/reports/${reportId}/publish`, {
+      method: 'POST',
+    });
+  },
+
+  generateReportFromCase: (
+    caseId: string,
+    params: {
+      report_type?: ReportType;
+      tlp?: string;
+      pap?: PAP;
+      title_override?: string;
+    } = {}
+  ): Promise<Report> => {
+    return request<Report>(`/reports/from-investigation/${caseId}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        case_id: caseId,
+        report_type: params.report_type || 'TECHNICAL',
+        tlp: params.tlp,
+        pap: params.pap,
+        title_override: params.title_override,
+      }),
+    });
+  },
+
+  exportReportStix: (reportId: string): Promise<any> => {
+    return request<any>(`/reports/${reportId}/export/stix`);
+  },
+
+  exportReportHtmlUrl: (reportId: string): string => {
+    return `${API_BASE}/reports/${reportId}/export/html`;
+  },
+
+  exportReportMarkdownUrl: (reportId: string): string => {
+    return `${API_BASE}/reports/${reportId}/export/markdown`;
+  },
+
+  exportReportCsvUrl: (reportId: string): string => {
+    return `${API_BASE}/reports/${reportId}/export/csv`;
   },
 };
 

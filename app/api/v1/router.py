@@ -10,6 +10,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.investigations import router as investigations_router
 from app.api.v1.iocs import router as iocs_router
 from app.api.v1.mitre import router as mitre_router
+from app.api.v1.reports import router as reports_router
 from app.api.v1.sources import router as sources_router
 from app.api.v1.timeline import router as timeline_router
 
@@ -25,4 +26,5 @@ api_router.include_router(timeline_router, prefix="/timeline", tags=["Temporal T
 api_router.include_router(entities_router, prefix="/entities", tags=["Advanced CTI Entities"])
 api_router.include_router(mitre_router, prefix="/mitre", tags=["MITRE ATT&CK Matrix"])
 api_router.include_router(investigations_router, prefix="/investigations", tags=["CTI Investigations & Case Management"])
+api_router.include_router(reports_router, prefix="/reports", tags=["Strategic Intelligence Bulletins & Reports"])
 api_router.include_router(audit_router)

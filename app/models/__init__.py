@@ -18,7 +18,10 @@ from app.models.enums import (
     EpistemicClassification,
     IOCStatus,
     IOCType,
+    PAP,
     RelationshipType,
+    ReportStatus,
+    ReportType,
     SourceCategory,
     SourceHealthStatus,
     UserRole,
@@ -26,6 +29,7 @@ from app.models.enums import (
 from app.models.investigation import CaseNote, InvestigationCase
 from app.models.ioc import CanonicalIOC, IOCLifecycleAudit, NormalizedEvidence, RawSourceRecord
 from app.models.relationship import CanonicalRelationship, compute_relationship_hash
+from app.models.report import Report, ReportObject
 from app.models.source import SourceRegistry
 from app.models.user import Organization, User
 
@@ -51,8 +55,13 @@ __all__ = [
     "MalwareFamily",
     "NormalizedEvidence",
     "Organization",
+    "PAP",
     "RawSourceRecord",
     "RelationshipType",
+    "Report",
+    "ReportObject",
+    "ReportStatus",
+    "ReportType",
     "SourceCategory",
     "SourceHealthStatus",
     "SourceRegistry",

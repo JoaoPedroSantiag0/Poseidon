@@ -150,4 +150,31 @@ class TimelineEventType(str, Enum):
     RESURGENCE = "RESURGENCE"
 
 
+class ReportType(str, Enum):
+    """STIX 2.1 aligned CTI Report Categories."""
+    STRATEGIC = "STRATEGIC"
+    TECHNICAL = "TECHNICAL"
+    OPERATIONAL = "OPERATIONAL"
+    TACTICAL = "TACTICAL"
+    VULNERABILITY_BULLETIN = "VULNERABILITY_BULLETIN"
+
+
+class ReportStatus(str, Enum):
+    """Intelligence Report publishing lifecycle."""
+    DRAFT = "DRAFT"
+    IN_REVIEW = "IN_REVIEW"
+    PUBLISHED = "PUBLISHED"
+    ARCHIVED = "ARCHIVED"
+    REVOKED = "REVOKED"
+
+
+class PAP(str, Enum):
+    """Permissible Actions Protocol (sharing & active measure constraints)."""
+    WHITE = "WHITE"
+    GREEN = "GREEN"
+    AMBER = "AMBER"
+    RED = "RED"
+
+
+
 

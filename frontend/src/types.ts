@@ -698,6 +698,92 @@ export interface TimelineQueryResponse {
   to_date?: string | null;
 }
 
+// Phase 9: Strategic Intelligence Bulletins & Reports Types
+export type ReportType =
+  | 'STRATEGIC'
+  | 'TECHNICAL'
+  | 'OPERATIONAL'
+  | 'TACTICAL'
+  | 'VULNERABILITY_BULLETIN';
+
+export type ReportStatus =
+  | 'DRAFT'
+  | 'IN_REVIEW'
+  | 'PUBLISHED'
+  | 'ARCHIVED'
+  | 'REVOKED';
+
+export type PAP = 'WHITE' | 'GREEN' | 'AMBER' | 'RED';
+
+export interface ReportObject {
+  id: string;
+  report_id: string;
+  entity_type: string;
+  entity_id: string;
+  epistemic_classification: EpistemicClassification;
+  role_in_report: string;
+  label: string;
+  created_at: string;
+}
+
+export interface Report {
+  id: string;
+  report_number: string;
+  title: string;
+  report_type: ReportType;
+  status: ReportStatus;
+  tlp: TLP;
+  pap: PAP;
+  confidence: number;
+  summary: string;
+  content_markdown: string;
+  published_at?: string | null;
+  author_id?: string | null;
+  author_name: string;
+  investigation_id?: string | null;
+  tags: string[];
+  mitre_attack: string[];
+  targeted_sectors: string[];
+  targeted_countries: string[];
+  recommendations: string[];
+  objects: ReportObject[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportListResponse {
+  items: Report[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface ReportCreatePayload {
+  title: string;
+  report_type: ReportType;
+  status?: ReportStatus;
+  tlp?: TLP;
+  pap?: PAP;
+  confidence?: number;
+  summary?: string;
+  content_markdown?: string;
+  author_name?: string;
+  tags?: string[];
+  mitre_attack?: string[];
+  targeted_sectors?: string[];
+  targeted_countries?: string[];
+  recommendations?: string[];
+  objects?: {
+    entity_type: string;
+    entity_id: string;
+    epistemic_classification?: EpistemicClassification;
+    role_in_report?: string;
+    label?: string;
+  }[];
+}
+
+
 
 
 
