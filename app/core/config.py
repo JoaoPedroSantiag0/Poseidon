@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     DEFAULT_ADMIN_PASSWORD: str = "PoseidonAdmin2026!#"
     DEFAULT_ADMIN_NAME: str = "Poseidon System Administrator"
     DEFAULT_ORG_NAME: str = "Poseidon Threat Operations"
+    # AI Analyst Provider Settings
+    GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
+    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
+    ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
+    OLLAMA_BASE_URL: str | None = os.getenv("OLLAMA_BASE_URL")
+    AI_MODEL_NAME: str = os.getenv("POSEIDON_AI_MODEL", "gemini-1.5-pro")
 
 
 settings = Settings()

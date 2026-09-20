@@ -783,7 +783,64 @@ export interface ReportCreatePayload {
   }[];
 }
 
+// Phase 10: Assistive AI Threat Analyst Types
+export interface AICitationItem {
+  entity_type: string;
+  entity_id: string;
+  label: string;
+  risk_score?: number | null;
+  confidence_score?: number | null;
+  relationship_context?: string | null;
+}
 
+export interface AIQueryResponse {
+  query: string;
+  response_markdown: string;
+  chain_of_thought: string[];
+  citations: AICitationItem[];
+  epistemic_breakdown: Record<string, string[]>;
+  suggested_followups: string[];
+  model_used: string;
+  provider: string;
+}
 
+export interface HypothesisEvaluationItem {
+  claim: string;
+  epistemic_type: EpistemicClassification;
+  evidence_text: string;
+  entity_id?: string | null;
+  entity_label?: string | null;
+  weight: number;
+}
 
+export interface HypothesisEvaluationResponse {
+  hypothesis: string;
+  overall_verdict: string;
+  confidence_score: number;
+  evidence_for: HypothesisEvaluationItem[];
+  evidence_against: HypothesisEvaluationItem[];
+  analytical_gaps: string[];
+  recommended_actions: string[];
+  citations: AICitationItem[];
+}
+
+export interface DossierSummarizeResponse {
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  executive_summary: string;
+  key_findings: string[];
+  mitre_techniques: string[];
+  related_indicators_count: number;
+  dossier_markdown: string;
+  citations: AICitationItem[];
+}
+
+export interface AIEngineStatusResponse {
+  provider: string;
+  model: string;
+  is_online: boolean;
+  capabilities: string[];
+  zero_hallucination_guardrail_active: boolean;
+}
 

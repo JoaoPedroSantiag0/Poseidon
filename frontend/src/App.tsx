@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CommandPalette } from './components/ui';
 import { api, clearAuthToken, getAuthToken } from './services/api';
 import type { Source, User } from './types';
+import { AIAnalystView } from './views/AIAnalystView';
 import { AuditView } from './views/AuditView';
 import { DashboardView } from './views/DashboardView';
 import { EnrichmentView } from './views/EnrichmentView';
@@ -240,6 +241,22 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'ai-analyst' && (
+            <AIAnalystView
+              onNavigateToGraph={(seedId) => {
+                setSelectedGraphIOCId(seedId);
+                setCurrentTab('graph');
+              }}
+              onNavigateToIOC={(iocId) => {
+                setSelectedGraphIOCId(iocId);
+                setCurrentTab('iocs');
+              }}
+              onNavigateToInvestigation={(_caseId) => {
+                setCurrentTab('investigations');
+              }}
+            />
+          )}
+
           {(currentTab === 'sources' || currentTab === 'sources-settings') && (
             <SourcesView sources={sources} onRefreshSources={fetchSources} />
           )}
@@ -259,6 +276,7 @@ export const App: React.FC = () => {
             'enrichment',
             'timeline',
             'reports',
+            'ai-analyst',
             'sources',
             'sources-settings',
             'audit',

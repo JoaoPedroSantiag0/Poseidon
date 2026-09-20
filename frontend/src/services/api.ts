@@ -1,6 +1,8 @@
 import type {
   AddEntityRequest,
   AddNoteRequest,
+  AIEngineStatusResponse,
+  AIQueryResponse,
   AuditLog,
   BulkEnrichRequest,
   BulkEnrichResponse,
@@ -12,7 +14,9 @@ import type {
   CorrelationTriggerResponse,
   CreateCaseRequest,
   CreateRelationshipRequest,
+  DossierSummarizeResponse,
   GraphData,
+  HypothesisEvaluationResponse,
   IOCDetail,
   IOCIngestPayload,
   IOCListResponse,
@@ -680,6 +684,47 @@ export const api = {
   exportReportCsvUrl: (reportId: string): string => {
     return `${API_BASE}/reports/${reportId}/export/csv`;
   },
+
+  // Phase 10: Assistive AI Threat Analyst
+  getAIStatus: (): Promise<AIEngineStatusResponse> => {
+    return request<AIEngineStatusResponse>('/ai/status');
+  },
+
+  queryAI: (prompt: string, focusEntities?: string[]): Promise<AIQueryResponse> => {
+    return request<AIQueryResponse>('/ai/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt,
+        focus_entities: focusEntities,
+      }),
+    });
+  },
+
+  evaluateHypothesisAI: (
+    hypothesisText: string,
+    caseId?: string,
+    targetEntities?: string[]
+  ): Promise<HypothesisEvaluationResponse> => {
+    return request<HypothesisEvaluationResponse>('/ai/evaluate-hypothesis', {
+      method: 'POST',
+      body: JSON.stringify({
+        hypothesis_text: hypothesisText,
+        case_id: caseId,
+        target_entities: targetEntities,
+      }),
+    });
+  },
+
+  summarizeDossierAI: (entityType: string, entityId: string): Promise<DossierSummarizeResponse> => {
+    return request<DossierSummarizeResponse>('/ai/summarize', {
+      method: 'POST',
+      body: JSON.stringify({
+        entity_type: entityType,
+        entity_id: entityId,
+      }),
+    });
+  },
 };
+
 
 

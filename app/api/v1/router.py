@@ -1,6 +1,7 @@
 """Aggregated API v1 Router."""
 from fastapi import APIRouter
 
+from app.api.v1.ai_analyst import router as ai_analyst_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.enrichment import router as enrichment_router
@@ -27,4 +28,5 @@ api_router.include_router(entities_router, prefix="/entities", tags=["Advanced C
 api_router.include_router(mitre_router, prefix="/mitre", tags=["MITRE ATT&CK Matrix"])
 api_router.include_router(investigations_router, prefix="/investigations", tags=["CTI Investigations & Case Management"])
 api_router.include_router(reports_router, prefix="/reports", tags=["Strategic Intelligence Bulletins & Reports"])
+api_router.include_router(ai_analyst_router, prefix="/ai", tags=["Assistive AI Threat Analyst"])
 api_router.include_router(audit_router)

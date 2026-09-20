@@ -16,6 +16,7 @@ import {
   Lock,
   Cpu,
   Fingerprint,
+  Sparkles,
 } from 'lucide-react';
 import type { User } from '../types';
 
@@ -52,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       label: 'OPERATIONS',
       items: [
+        { id: 'ai-analyst', label: 'AI Threat Analyst', icon: Sparkles, badge: 'AI' },
         { id: 'investigations', label: 'Investigations', icon: FolderGit2 },
         { id: 'enrichment', label: 'Enrichment & Bulk', icon: Search },
         { id: 'sources', label: 'Source Center', icon: Radio, badge: '6' },

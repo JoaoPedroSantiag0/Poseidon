@@ -14,6 +14,7 @@ PERM_AUDIT_READ = "audit:read"
 PERM_STIX_EXPORT = "stix:export"
 PERM_REPORT_READ = "report:read"
 PERM_REPORT_WRITE = "report:write"
+PERM_AI_QUERY = "ai:query"
 
 # Role to Permissions Mapping
 ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
@@ -29,6 +30,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_STIX_EXPORT,
         PERM_REPORT_READ,
         PERM_REPORT_WRITE,
+        PERM_AI_QUERY,
     },
     UserRole.CTI_ANALYST: {
         PERM_IOC_READ,
@@ -40,6 +42,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_STIX_EXPORT,
         PERM_REPORT_READ,
         PERM_REPORT_WRITE,
+        PERM_AI_QUERY,
     },
     UserRole.THREAT_HUNTER: {
         PERM_IOC_READ,
@@ -50,6 +53,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_STIX_EXPORT,
         PERM_REPORT_READ,
         PERM_REPORT_WRITE,
+        PERM_AI_QUERY,
     },
     UserRole.SOC_ANALYST: {
         PERM_IOC_READ,
@@ -57,6 +61,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         PERM_INVESTIGATION_READ,
         PERM_STIX_EXPORT,
         PERM_REPORT_READ,
+        PERM_AI_QUERY,
     },
     UserRole.VIEWER: {
         PERM_IOC_READ,
