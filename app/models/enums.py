@@ -103,3 +103,23 @@ class ConfidenceLevel(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
+
+
+class EpistemicClassification(str, Enum):
+    """Prompt 03 epistemic classification: Never present hypothesis as factual evidence."""
+    FACT = "FACT"
+    OBSERVATION = "OBSERVATION"
+    CORRELATION = "CORRELATION"
+    ASSESSMENT = "ASSESSMENT"
+    HYPOTHESIS = "HYPOTHESIS"
+    UNKNOWN = "UNKNOWN"
+
+
+class TLP(str, Enum):
+    """Traffic Light Protocol v2.0."""
+    CLEAR = "CLEAR"
+    GREEN = "GREEN"
+    AMBER = "AMBER"
+    AMBER_STRICT = "AMBER+STRICT"
+    RED = "RED"
+

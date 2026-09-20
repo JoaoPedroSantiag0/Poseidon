@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.errors import ErrorCode, PoseidonException, format_error_response
+from app.core.middleware import CorrelationIdMiddleware
 from app.db.session import init_db
 
 logger = structlog.get_logger(__name__)
@@ -31,8 +32,11 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
+# Distributed Tracing & Request Correlation Middleware
+app.add_middleware(CorrelationIdMiddleware)
 
 # CORS Configuration
 app.add_middleware(
@@ -54,18 +58,42 @@ async def root():
         "version": settings.VERSION,
         "status": "OPERATIONAL",
         "docs": f"{settings.API_V1_STR}/docs",
-        "api": settings.API_V1_STR
+        "api": settings.API_V1_STR,
     }
+
+
+@app.exception_handler(PoseidonException)
+async def poseidon_exception_handler(request: Request, exc: PoseidonException):
+    """Operational exception handler with structured taxonomy and correlation ID."""
+    logger.warning(
+        "operational_exception",
+        error_code=exc.code,
+        message=exc.message,
+        status_code=exc.status_code,
+        path=request.url.path,
+    )
+    return format_error_response(
+        code=exc.code,
+        message=exc.message,
+        status_code=exc.status_code,
+        request=request,
+        details=exc.details,
+    )
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("unhandled_exception", path=request.url.path, error=str(exc))
-    return JSONResponse(
+    """Unhandled internal exception handler with structured response."""
+    logger.error(
+        "unhandled_exception",
+        path=request.url.path,
+        error=str(exc),
+        error_type=type(exc).__name__,
+    )
+    return format_error_response(
+        code=ErrorCode.API_INTERNAL_ERROR,
+        message="An unexpected internal error occurred.",
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": "An internal server error occurred.",
-            "error_type": type(exc).__name__,
-            "path": request.url.path
-        }
+        request=request,
+        details={"error_type": type(exc).__name__},
     )
