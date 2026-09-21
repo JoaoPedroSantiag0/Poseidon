@@ -10,11 +10,15 @@ paths = [
     '''(?i)^\.git/''',
     '''(?i)^\.remember/''',
     '''(?i)tests/fixtures/''',
+    '''(?i)tests/test_security\.py''',
+    '''(?i)\.env\.production\.example''',
     '''(?i)docs/gates/TEMPLATE/''',
     '''(?i)docs/adr/TEMPLATE\.md'''
 ]
 regexes = [
     '''(?i)EXAMPLE[_-]?KEY''',
     '''(?i)YOUR[_-]?API[_-]?KEY''',
-    '''(?i)ACT-2026-000183'''
+    '''(?i)ACT-2026-000183''',
+    '''(?i)analyst@poseidon\.cti:Password''',
+    '''(?i)threatfox-api-secret-key'''
 ]
