@@ -6,12 +6,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connectors.manager import ConnectorManager
 from app.core.errors import ErrorCode, PoseidonException
-from app.models.enums import EpistemicClassification, IOCStatus, IOCType
+from app.models.enums import EpistemicClassification, IOCStatus, IOCType, RelationshipType
 from app.models.ioc import NormalizedEvidence, RawSourceRecord
+from app.models.relationship import CanonicalRelationship, compute_relationship_hash
 from app.services.ioc_service import IOCService
 from app.services.normalizer import compute_payload_sha256
 
@@ -134,6 +136,47 @@ class EnrichmentOrchestrator:
             for t in norm_result.get("tags", []):
                 if t:
                     accumulated_tags.add(t)
+
+            # E. Ingest Discovered Surface Relationships (e.g. pDNS resolutions, hostnames, SSL certs, CVEs)
+            for rel in norm_result.get("relationships", []):
+                try:
+                    target_val = rel.get("target_value")
+                    if not target_val:
+                        continue
+                    target_type = rel.get("target_type", "domain")
+                    rel_type_str = rel.get("relationship_type", "resolves-to")
+                    try:
+                        rel_type = RelationshipType(rel_type_str)
+                    except ValueError:
+                        rel_type = RelationshipType.RELATED_TO
+
+                    rel_hash = compute_relationship_hash(ioc.id, rel_type, str(target_val))
+                    stmt = select(CanonicalRelationship).where(CanonicalRelationship.relationship_hash == rel_hash)
+                    res = await db.execute(stmt)
+                    existing_rel = res.scalar_one_or_none()
+                    now = datetime.now(UTC)
+                    if existing_rel:
+                        existing_rel.last_seen = now
+                        existing_rel.confidence = max(existing_rel.confidence, float(rel.get("confidence", 70.0)))
+                    else:
+                        new_rel = CanonicalRelationship(
+                            source_id=ioc.id,
+                            source_type="ioc",
+                            target_id=str(target_val),
+                            target_type=target_type,
+                            relationship_type=rel_type,
+                            epistemic_classification=EpistemicClassification.CORRELATION,
+                            confidence=float(rel.get("confidence", 70.0)),
+                            first_seen=now,
+                            last_seen=now,
+                            source_name=src_model.name,
+                            rationale=f"Discovered via {src_model.name} surface telemetry",
+                            is_active=True,
+                            relationship_hash=rel_hash,
+                        )
+                        db.add(new_rel)
+                except Exception as rel_err:
+                    logger.debug("surface_relationship_ingest_skipped", error=str(rel_err))
 
         # 4. Synthesize final explainable risk score and multi-source confidence
         if found_count > 0:

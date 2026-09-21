@@ -911,4 +911,39 @@ export interface MispPushResponse {
   message: string;
 }
 
+export interface NetworkService {
+  port: number;
+  transport: string;
+  service_name?: string;
+  product?: string;
+  version?: string;
+  banner_preview?: string;
+  certificate_hash?: string;
+}
+
+export interface TLSCertificateInfo {
+  fingerprint_sha256?: string;
+  subject_dn?: string;
+  issuer_dn?: string;
+  names?: string[];
+}
+
+export interface PassiveDNSRecord {
+  hostname: string;
+  ip: string;
+  record_type: string;
+  first_seen?: string;
+  last_seen?: string;
+  count?: number;
+}
+
+export interface SurfaceIntelligence {
+  open_ports: number[];
+  services: NetworkService[];
+  tls_certificates: TLSCertificateInfo[];
+  passivedns_records: PassiveDNSRecord[];
+  cves_detected: string[];
+}
+
+
 

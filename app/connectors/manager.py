@@ -4,8 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connectors.abuseipdb import AbuseIPDBConnector
 from app.connectors.base import BaseCTIConnector
+from app.connectors.censys import CensysConnector
 from app.connectors.greynoise import GreyNoiseConnector
 from app.connectors.malwarebazaar import MalwareBazaarConnector
+from app.connectors.passivedns import PassiveDNSConnector
+from app.connectors.shodan import ShodanConnector
 from app.connectors.threatfox import ThreatFoxConnector
 from app.connectors.urlhaus import URLhausConnector
 from app.core.security import decrypt_secret
@@ -18,6 +21,9 @@ CONNECTOR_REGISTRY: dict[str, type[BaseCTIConnector]] = {
     "malwarebazaar": MalwareBazaarConnector,
     "abuseipdb": AbuseIPDBConnector,
     "greynoise": GreyNoiseConnector,
+    "shodan": ShodanConnector,
+    "censys": CensysConnector,
+    "passivedns": PassiveDNSConnector,
 }
 
 

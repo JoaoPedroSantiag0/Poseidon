@@ -7,10 +7,13 @@ import {
   Database,
   Eye,
   Filter,
+  Globe,
+  Lock,
   Network,
   Plus,
   RefreshCw,
   Search,
+  Server,
   Shield,
   ShieldAlert,
   X,
@@ -25,10 +28,128 @@ import {
   StatusBadge,
 } from '../components/ui';
 import { api } from '../services/api';
-import type { CanonicalIOC, IOCDetail, RawSourceRecord } from '../types';
+import type {
+  CanonicalIOC,
+  IOCDetail,
+  NetworkService,
+  PassiveDNSRecord,
+  RawSourceRecord,
+  SurfaceIntelligence,
+  TLSCertificateInfo,
+} from '../types';
 
 interface IOCViewProps {
   onNavigateToGraph?: (iocId: string) => void;
+}
+
+function parseSurfaceData(detail: IOCDetail | null): SurfaceIntelligence {
+  if (!detail) {
+    return { open_ports: [], services: [], tls_certificates: [], passivedns_records: [], cves_detected: [] };
+  }
+
+  const portsSet = new Set<number>();
+  const cvesSet = new Set<string>();
+  const servicesList: NetworkService[] = [];
+  const certsList: TLSCertificateInfo[] = [];
+  const pdnsList: PassiveDNSRecord[] = [];
+
+  // 1. From normalized evidences
+  for (const ev of detail.evidences || []) {
+    if (ev.key === 'open_ports' || ev.key === 'censys_open_ports') {
+      const parts = String(ev.value).split(',');
+      for (const p of parts) {
+        const num = parseInt(p.trim(), 10);
+        if (!isNaN(num)) portsSet.add(num);
+      }
+    } else if (ev.key.startsWith('high_risk_port_')) {
+      const portNum = parseInt(ev.key.replace('high_risk_port_', ''), 10);
+      if (!isNaN(portNum)) portsSet.add(portNum);
+    } else if (ev.key === 'cve_vulnerability') {
+      cvesSet.add(String(ev.value));
+    } else if (ev.key.startsWith('pdns_')) {
+      pdnsList.push({
+        hostname: ev.key.includes('hostname') ? String(ev.value).split(' ')[1] || String(ev.value) : detail.normalized_value,
+        ip: ev.key.includes('ip') ? String(ev.value).split(' ')[3] || String(ev.value) : detail.normalized_value,
+        record_type: 'A',
+        first_seen: ev.observed_at,
+        last_seen: ev.observed_at,
+      });
+    }
+  }
+
+  // 2. From raw_records (rich payloads from Shodan, Censys, PassiveDNS)
+  for (const raw of detail.raw_records || []) {
+    const payload = raw.raw_payload || {};
+    if (raw.source_id === 'shodan') {
+      if (Array.isArray(payload.ports)) {
+        payload.ports.forEach((p: number) => portsSet.add(p));
+      }
+      if (Array.isArray(payload.vulns)) {
+        payload.vulns.forEach((v: string) => cvesSet.add(v));
+      }
+      if (Array.isArray(payload.data)) {
+        payload.data.forEach((svc: any) => {
+          servicesList.push({
+            port: svc.port,
+            transport: svc.transport || 'tcp',
+            product: svc.product,
+            version: svc.version,
+            banner_preview: typeof svc.data === 'string' ? svc.data.slice(0, 160) : '',
+          });
+          if (svc.ssl?.cert) {
+            certsList.push({
+              subject_dn: svc.ssl.cert.subject?.CN,
+              issuer_dn: svc.ssl.cert.issuer?.CN,
+              fingerprint_sha256: svc.ssl.cert.fingerprint?.sha256,
+            });
+          }
+        });
+      }
+    } else if (raw.source_id === 'censys') {
+      const result = payload.result || {};
+      if (Array.isArray(result.services)) {
+        result.services.forEach((svc: any) => {
+          if (svc.port) portsSet.add(svc.port);
+          servicesList.push({
+            port: svc.port,
+            transport: svc.transport_protocol || 'tcp',
+            service_name: svc.service_name,
+            product: svc.software?.map((s: any) => `${s.vendor || ''} ${s.product || ''}`).join(', ').trim(),
+          });
+          const leaf = svc.tls?.certificates?.leaf_data;
+          if (leaf) {
+            certsList.push({
+              subject_dn: leaf.subject_dn,
+              issuer_dn: leaf.issuer_dn,
+              fingerprint_sha256: leaf.fingerprint || svc.certificate,
+              names: leaf.names,
+            });
+          }
+        });
+      }
+    } else if (raw.source_id === 'passivedns') {
+      if (Array.isArray(payload.records)) {
+        payload.records.forEach((rec: any) => {
+          pdnsList.push({
+            hostname: rec.hostname || rec.domain || '',
+            ip: rec.ip || rec.ip_address || '',
+            record_type: rec.record_type || 'A',
+            first_seen: rec.first_seen,
+            last_seen: rec.last_seen,
+            count: rec.count,
+          });
+        });
+      }
+    }
+  }
+
+  return {
+    open_ports: Array.from(portsSet).sort((a, b) => a - b),
+    services: servicesList,
+    tls_certificates: certsList,
+    passivedns_records: pdnsList,
+    cves_detected: Array.from(cvesSet),
+  };
 }
 
 export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
@@ -49,7 +170,7 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
   const [selectedIOCId, setSelectedIOCId] = useState<string | null>(null);
   const [selectedIOCDetail, setSelectedIOCDetail] = useState<IOCDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<'overview' | 'lineage' | 'timeline' | 'graph'>('overview');
+  const [activeDetailTab, setActiveDetailTab] = useState<'overview' | 'lineage' | 'timeline' | 'graph' | 'surface'>('overview');
   const [iocGraphData, setIocGraphData] = useState<any>(null);
   const [isLoadingGraph, setIsLoadingGraph] = useState(false);
 
@@ -793,6 +914,17 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
                 <Network className="w-3.5 h-3.5" />
                 Knowledge Graph ({iocGraphData?.edges?.length || 0})
               </button>
+              <button
+                onClick={() => setActiveDetailTab('surface')}
+                className={`py-3 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
+                  activeDetailTab === 'surface'
+                    ? 'border-poseidon-cyan text-poseidon-cyan'
+                    : 'border-transparent text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Surface & pDNS
+              </button>
             </div>
 
             {/* Modal Body */}
@@ -935,7 +1067,7 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
                     </div>
                   ))}
                 </div>
-              ) : (
+              ) : activeDetailTab === 'graph' ? (
                 /* Knowledge Graph Tab */
                 <div className="space-y-4">
                   <div className="p-3 bg-slate-900/40 border border-poseidon-border rounded-lg text-xs text-slate-300 flex items-center justify-between">
@@ -1016,6 +1148,248 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
                     </div>
                   )}
                 </div>
+              ) : (
+                /* Network Surface & Passive DNS Tab */
+                (() => {
+                  const surface = parseSurfaceData(selectedIOCDetail);
+                  return (
+                    <div className="space-y-6">
+                      {/* Top Surface Metrics */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div className="p-3.5 bg-slate-900/80 border border-poseidon-border rounded-xl">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                            Discovered Open Ports
+                          </span>
+                          <span className="text-xl font-mono font-bold text-white">
+                            {surface.open_ports.length}
+                          </span>
+                        </div>
+                        <div className="p-3.5 bg-slate-900/80 border border-poseidon-border rounded-xl">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                            Listening Services
+                          </span>
+                          <span className="text-xl font-mono font-bold text-sky-400">
+                            {surface.services.length}
+                          </span>
+                        </div>
+                        <div className="p-3.5 bg-slate-900/80 border border-poseidon-border rounded-xl">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                            pDNS Resolutions
+                          </span>
+                          <span className="text-xl font-mono font-bold text-emerald-400">
+                            {surface.passivedns_records.length}
+                          </span>
+                        </div>
+                        <div className="p-3.5 bg-slate-900/80 border border-poseidon-border rounded-xl">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                            Detected CVEs
+                          </span>
+                          <span className={`text-xl font-mono font-bold ${surface.cves_detected.length > 0 ? 'text-rose-400' : 'text-slate-500'}`}>
+                            {surface.cves_detected.length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Open Ports Cluster */}
+                      <div className="p-4 bg-slate-900/80 border border-poseidon-border rounded-xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Server className="w-4 h-4 text-poseidon-cyan" />
+                            <span className="font-bold text-xs font-mono text-slate-100 uppercase">
+                              Port Reconnaissance Matrix (Shodan / Censys)
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {surface.open_ports.length === 0 ? 'No open ports indexed' : `${surface.open_ports.length} ports accessible`}
+                          </span>
+                        </div>
+
+                        {surface.open_ports.length === 0 ? (
+                          <p className="text-xs font-mono text-slate-500 py-2">
+                            No open ports currently recorded for this address. Trigger Live Enrich to query Shodan and Censys.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {surface.open_ports.map((port) => {
+                              const isHighRisk = [23, 445, 3389, 5900, 502, 102].includes(port);
+                              const isElevated = [21, 22, 25, 8080, 8443].includes(port);
+                              const isWeb = [80, 443].includes(port);
+
+                              return (
+                                <div
+                                  key={port}
+                                  className={`px-3 py-1.5 rounded-lg border font-mono text-xs flex items-center gap-1.5 ${
+                                    isHighRisk
+                                      ? 'bg-rose-950/60 border-rose-800 text-rose-300 shadow-sm shadow-rose-950/50'
+                                      : isElevated
+                                      ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                                      : isWeb
+                                      ? 'bg-sky-950/60 border-sky-800 text-sky-300'
+                                      : 'bg-slate-800 border-slate-700 text-slate-300'
+                                  }`}
+                                >
+                                  <span className="font-bold">Port {port}</span>
+                                  {isHighRisk && <span className="text-[10px] px-1 py-0.2 bg-rose-900 rounded font-bold uppercase">Critical</span>}
+                                  {port === 3389 && <span className="text-[10px] text-rose-400">RDP</span>}
+                                  {port === 445 && <span className="text-[10px] text-rose-400">SMB</span>}
+                                  {port === 23 && <span className="text-[10px] text-rose-400">Telnet</span>}
+                                  {port === 443 && <span className="text-[10px] text-sky-400">HTTPS</span>}
+                                  {port === 80 && <span className="text-[10px] text-sky-400">HTTP</span>}
+                                  {port === 22 && <span className="text-[10px] text-amber-400">SSH</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Detected CVEs */}
+                      {surface.cves_detected.length > 0 && (
+                        <div className="p-4 bg-rose-950/20 border border-rose-900/60 rounded-xl space-y-2">
+                          <div className="flex items-center gap-2 text-rose-400 font-mono text-xs font-bold uppercase">
+                            <ShieldAlert className="w-4 h-4" />
+                            <span>Vulnerabilities Identified on Infrastructure</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {surface.cves_detected.map((cve) => (
+                              <span
+                                key={cve}
+                                className="px-2.5 py-1 bg-rose-950 border border-rose-800 rounded font-mono text-xs text-rose-300 font-bold"
+                              >
+                                {cve}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Services & Banners */}
+                      {surface.services.length > 0 && (
+                        <div className="p-4 bg-slate-900/80 border border-poseidon-border rounded-xl space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Server className="w-4 h-4 text-sky-400" />
+                            <span className="font-bold text-xs font-mono text-slate-100 uppercase">
+                              Service Banners & Software Fingerprints ({surface.services.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2.5">
+                            {surface.services.map((svc, idx) => (
+                              <div key={idx} className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 font-bold">
+                                      Port {svc.port}/{svc.transport}
+                                    </span>
+                                    {svc.product && <span className="text-slate-200 font-bold">{svc.product} {svc.version || ''}</span>}
+                                    {svc.service_name && <span className="text-slate-400">({svc.service_name})</span>}
+                                  </div>
+                                </div>
+                                {svc.banner_preview && (
+                                  <pre className="p-2 bg-slate-900 rounded border border-slate-800/80 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap">
+                                    {svc.banner_preview}
+                                  </pre>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Passive DNS Resolution Stream */}
+                      <div className="p-4 bg-slate-900/80 border border-poseidon-border rounded-xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Globe className="w-4 h-4 text-emerald-400" />
+                            <span className="font-bold text-xs font-mono text-slate-100 uppercase">
+                              Passive DNS Resolution History & Telemetry ({surface.passivedns_records.length})
+                            </span>
+                          </div>
+                          {surface.passivedns_records.length > 5 && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                              Active DNS Stream
+                            </span>
+                          )}
+                        </div>
+
+                        {surface.passivedns_records.length === 0 ? (
+                          <p className="text-xs font-mono text-slate-500 py-2">
+                            No historical pDNS resolution records captured yet.
+                          </p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs font-mono">
+                              <thead>
+                                <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                                  <th className="pb-2">Hostname / Domain</th>
+                                  <th className="pb-2">Resolving IP</th>
+                                  <th className="pb-2">Type</th>
+                                  <th className="pb-2">First Seen</th>
+                                  <th className="pb-2">Last Seen</th>
+                                  <th className="pb-2 text-right">Lookups</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/50">
+                                {surface.passivedns_records.map((rec, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                                    <td className="py-2.5 font-bold text-sky-400">{rec.hostname}</td>
+                                    <td className="py-2.5 text-slate-300">{rec.ip}</td>
+                                    <td className="py-2.5">
+                                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400">
+                                        {rec.record_type}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 text-slate-400 text-[11px]">
+                                      {rec.first_seen ? new Date(rec.first_seen).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                    <td className="py-2.5 text-slate-400 text-[11px]">
+                                      {rec.last_seen ? new Date(rec.last_seen).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                    <td className="py-2.5 text-right text-slate-300">{rec.count || 1}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* TLS Certificates */}
+                      {surface.tls_certificates.length > 0 && (
+                        <div className="p-4 bg-slate-900/80 border border-poseidon-border rounded-xl space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-poseidon-gold" />
+                            <span className="font-bold text-xs font-mono text-slate-100 uppercase">
+                              TLS / X.509 Certificates Inspected ({surface.tls_certificates.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {surface.tls_certificates.map((cert, idx) => (
+                              <div key={idx} className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono space-y-1">
+                                {cert.subject_dn && (
+                                  <div>
+                                    <span className="text-slate-500 text-[10px] uppercase block">Subject:</span>
+                                    <span className="text-poseidon-cyan font-bold">{cert.subject_dn}</span>
+                                  </div>
+                                )}
+                                {cert.issuer_dn && (
+                                  <div>
+                                    <span className="text-slate-500 text-[10px] uppercase block">Issuer:</span>
+                                    <span className="text-slate-300">{cert.issuer_dn}</span>
+                                  </div>
+                                )}
+                                {cert.fingerprint_sha256 && (
+                                  <div className="text-[11px] text-slate-400 pt-1">
+                                    <span className="text-slate-600">SHA-256:</span> {cert.fingerprint_sha256}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </div>
           </div>
