@@ -4,7 +4,9 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  Compass,
   Database,
+  ExternalLink,
   Eye,
   Filter,
   Globe,
@@ -150,6 +152,154 @@ function parseSurfaceData(detail: IOCDetail | null): SurfaceIntelligence {
     passivedns_records: pdnsList,
     cves_detected: Array.from(cvesSet),
   };
+}
+
+interface PivotPlatform {
+  id: string;
+  name: string;
+  badge: string;
+  category: string;
+  url: string;
+  color: string;
+  description: string;
+}
+
+function getPivotingPlatforms(iocType: string, rawValue: string): PivotPlatform[] {
+  const enc = encodeURIComponent(rawValue);
+  const type = iocType.toLowerCase();
+  const isHash = type.startsWith('hash_');
+  const isIP = type === 'ipv4' || type === 'ipv6';
+  const isDomain = type === 'domain' || type === 'fqdn';
+  const isURL = type === 'url';
+
+  const platforms: PivotPlatform[] = [];
+
+  // 1. VirusTotal
+  let vtUrl = `https://www.virustotal.com/gui/search/${enc}`;
+  if (isHash) vtUrl = `https://www.virustotal.com/gui/file/${rawValue}`;
+  else if (isIP) vtUrl = `https://www.virustotal.com/gui/ip-address/${rawValue}`;
+  else if (isDomain) vtUrl = `https://www.virustotal.com/gui/domain/${rawValue}`;
+  else if (isURL) {
+    try {
+      const b64 = btoa(rawValue).replace(/=+$/, '');
+      vtUrl = `https://www.virustotal.com/gui/url/${b64}`;
+    } catch {
+      vtUrl = `https://www.virustotal.com/gui/search/${enc}`;
+    }
+  }
+  platforms.push({
+    id: 'virustotal',
+    name: 'VirusTotal',
+    badge: 'Multi-AV & Sandbox',
+    category: 'Google Chronicle',
+    url: vtUrl,
+    color: 'border-blue-500/40 text-blue-400 hover:border-blue-400 hover:bg-blue-950/30',
+    description: '70+ antivirus engines, dynamic sandbox execution, and crowdsourced reputation verdicts.',
+  });
+
+  // 2. URLScan.io
+  if (isDomain || isIP || isURL) {
+    platforms.push({
+      id: 'urlscan',
+      name: 'URLScan.io',
+      badge: 'DOM & Screenshots',
+      category: 'Web Sandbox',
+      url: `https://urlscan.io/search/#${enc}`,
+      color: 'border-emerald-500/40 text-emerald-400 hover:border-emerald-400 hover:bg-emerald-950/30',
+      description: 'Automated browser execution, full-page screenshots, DOM structure, and redirect lineage.',
+    });
+  }
+
+  // 3. AbuseIPDB
+  if (isIP) {
+    platforms.push({
+      id: 'abuseipdb',
+      name: 'AbuseIPDB',
+      badge: 'Abuse Confidence',
+      category: 'Community Telemetry',
+      url: `https://www.abuseipdb.com/check/${enc}`,
+      color: 'border-amber-500/40 text-amber-400 hover:border-amber-400 hover:bg-amber-950/30',
+      description: 'Crowdsourced attack telemetry, bruteforce frequency, and IP abuse confidence score.',
+    });
+  }
+
+  // 4. Shodan
+  if (isIP || isDomain) {
+    platforms.push({
+      id: 'shodan',
+      name: 'Shodan',
+      badge: 'IoT & Exposed Ports',
+      category: 'Internet Scanner',
+      url: isIP ? `https://www.shodan.io/host/${enc}` : `https://www.shodan.io/search?query=hostname%3A${enc}`,
+      color: 'border-rose-500/40 text-rose-400 hover:border-rose-400 hover:bg-rose-950/30',
+      description: 'Global port reconnaissance, exposed OT/IoT devices, CVE correlations, and service banners.',
+    });
+  }
+
+  // 5. AlienVault OTX
+  let otxUrl = `https://otx.alienvault.com/browse/global/pulses?q=${enc}`;
+  if (isIP) otxUrl = `https://otx.alienvault.com/indicator/ip/${enc}`;
+  else if (isDomain) otxUrl = `https://otx.alienvault.com/indicator/domain/${enc}`;
+  else if (isHash) otxUrl = `https://otx.alienvault.com/indicator/file/${enc}`;
+  platforms.push({
+    id: 'otx',
+    name: 'AlienVault OTX',
+    badge: 'Threat Pulses',
+    category: 'AT&T Cybersecurity',
+    url: otxUrl,
+    color: 'border-purple-500/40 text-purple-400 hover:border-purple-400 hover:bg-purple-950/30',
+    description: 'Open Threat Exchange pulses, collaborative threat actor mapping, and YARA signatures.',
+  });
+
+  // 6. Pulsedive
+  platforms.push({
+    id: 'pulsedive',
+    name: 'Pulsedive',
+    badge: 'Community Risk',
+    category: 'Open CTI Feed',
+    url: `https://pulsedive.com/indicator/?q=${enc}`,
+    color: 'border-sky-500/40 text-sky-400 hover:border-sky-400 hover:bg-sky-950/30',
+    description: 'Community indicator lookup, risk classification, active DNS history, and threat attributes.',
+  });
+
+  // 7. GreyNoise Visualizer
+  if (isIP) {
+    platforms.push({
+      id: 'greynoise',
+      name: 'GreyNoise Visualizer',
+      badge: 'Scanner vs Target',
+      category: 'Noise Reduction',
+      url: `https://viz.greynoise.io/ip/${enc}`,
+      color: 'border-teal-500/40 text-teal-400 hover:border-teal-400 hover:bg-teal-950/30',
+      description: 'Separates mass internet scanning noise from opportunistic and targeted adversary probes.',
+    });
+  }
+
+  // 8. ThreatFox (abuse.ch)
+  platforms.push({
+    id: 'threatfox',
+    name: 'ThreatFox',
+    badge: 'C2 Tracker',
+    category: 'abuse.ch Project',
+    url: `https://threatfox.abuse.ch/browse.php?search=${enc}`,
+    color: 'border-orange-500/40 text-orange-400 hover:border-orange-400 hover:bg-orange-950/30',
+    description: 'Curated malicious Command and Control (C2) indicators shared by researchers worldwide.',
+  });
+
+  // 9. MalwareBazaar (abuse.ch)
+  if (isHash) {
+    platforms.push({
+      id: 'malwarebazaar',
+      name: 'MalwareBazaar',
+      badge: 'Malware Samples',
+      category: 'abuse.ch Repository',
+      url: `https://bazaar.abuse.ch/sample/${enc}/`,
+      color: 'border-red-500/40 text-red-400 hover:border-red-400 hover:bg-red-950/30',
+      description: 'Public malware binary repository with SSDEEP fuzzy hash matching and disassembly.',
+    });
+  }
+
+  return platforms;
 }
 
 export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
@@ -601,11 +751,11 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
                         <button
                           onClick={() => handleEnrich(ioc)}
                           disabled={enrichingIOCId === ioc.id}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-poseidon-border hover:border-poseidon-gold/60 rounded text-[11px] text-slate-300 flex items-center gap-1 transition-colors disabled:opacity-50"
-                          title="Trigger multi-source live enrichment"
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-poseidon-border hover:border-poseidon-cyan/60 rounded text-[11px] text-slate-300 flex items-center gap-1 transition-colors disabled:opacity-50"
+                          title="Trigger one-click deep live enrichment across VirusTotal v3, AbuseIPDB, Shodan, ThreatFox"
                         >
-                          <Zap className={`w-3 h-3 text-poseidon-gold ${enrichingIOCId === ioc.id ? 'animate-bounce' : ''}`} />
-                          {enrichingIOCId === ioc.id ? '...' : 'Enrich'}
+                          <Zap className={`w-3 h-3 text-poseidon-cyan ${enrichingIOCId === ioc.id ? 'animate-spin' : ''}`} />
+                          {enrichingIOCId === ioc.id ? 'Enriching...' : 'Deep Enrich'}
                         </button>
                         <button
                           onClick={() => handleOpenDetail(ioc)}
@@ -838,10 +988,11 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
                   <button
                     onClick={() => handleEnrich(selectedIOCDetail)}
                     disabled={enrichingIOCId === selectedIOCDetail.id}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-poseidon-cyan hover:bg-sky-400 text-slate-950 font-bold rounded text-xs transition-colors disabled:opacity-50 shadow-sm"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-poseidon-cyan to-sky-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-bold rounded-lg text-xs transition-all disabled:opacity-50 shadow-md shadow-cyan-500/20 active:scale-95"
+                    title="Execute multi-source on-demand live enrichment (VirusTotal v3, AbuseIPDB, Shodan, ThreatFox)"
                   >
-                    <Zap className="w-3.5 h-3.5 text-slate-950" />
-                    {enrichingIOCId === selectedIOCDetail.id ? 'Enriching...' : 'Live Enrich'}
+                    <Zap className={`w-3.5 h-3.5 text-slate-950 ${enrichingIOCId === selectedIOCDetail.id ? 'animate-spin' : ''}`} />
+                    {enrichingIOCId === selectedIOCDetail.id ? 'Deep Enriching...' : 'One-Click Deep Enrich'}
                   </button>
                 )}
                 {selectedIOCDetail && (
@@ -1006,6 +1157,60 @@ export const IOCView: React.FC<IOCViewProps> = ({ onNavigateToGraph }) => {
                         >
                           #{tag}
                         </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* External Pivoting & Global Intelligence Enclave */}
+                  <div className="p-5 bg-slate-900/70 border border-poseidon-border/80 rounded-xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-poseidon-cyan/10 border border-poseidon-cyan/30 text-poseidon-cyan">
+                          <Compass className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-mono text-slate-100 uppercase tracking-wider font-bold">
+                            External Pivoting & Global Intelligence Enclave
+                          </h3>
+                          <p className="text-[11px] text-slate-400">
+                            Contextual 1-click pivoting into authoritative OSINT & multi-vendor threat platforms (SOCRadar Ecosystem)
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 self-start sm:self-auto">
+                        Type: {selectedIOCDetail.ioc_type.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {getPivotingPlatforms(selectedIOCDetail.ioc_type, selectedIOCDetail.normalized_value).map((plat) => (
+                        <a
+                          key={plat.id}
+                          href={plat.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`p-3.5 rounded-lg border bg-slate-950/60 transition-all flex flex-col justify-between group ${plat.color}`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-1 mb-1.5">
+                              <span className="font-bold text-xs font-mono text-slate-100 group-hover:text-white flex items-center gap-1.5">
+                                {plat.name}
+                                <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                              </span>
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                                {plat.badge}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400 block mb-1.5">{plat.category}</span>
+                            <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                              {plat.description}
+                            </p>
+                          </div>
+                          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-500">
+                            <span>Direct Pivot</span>
+                            <span className="text-poseidon-cyan group-hover:underline">Open Live Telemetry →</span>
+                          </div>
+                        </a>
                       ))}
                     </div>
                   </div>

@@ -11,6 +11,7 @@ from app.connectors.passivedns import PassiveDNSConnector
 from app.connectors.shodan import ShodanConnector
 from app.connectors.threatfox import ThreatFoxConnector
 from app.connectors.urlhaus import URLhausConnector
+from app.connectors.virustotal import VirusTotalConnector
 from app.core.security import decrypt_secret
 from app.models.enums import IOCType
 from app.models.source import SourceRegistry
@@ -21,6 +22,7 @@ CONNECTOR_REGISTRY: dict[str, type[BaseCTIConnector]] = {
     "malwarebazaar": MalwareBazaarConnector,
     "abuseipdb": AbuseIPDBConnector,
     "greynoise": GreyNoiseConnector,
+    "virustotal": VirusTotalConnector,
     "shodan": ShodanConnector,
     "censys": CensysConnector,
     "passivedns": PassiveDNSConnector,
