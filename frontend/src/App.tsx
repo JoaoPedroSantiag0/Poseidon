@@ -124,6 +124,9 @@ export const App: React.FC = () => {
               onOpenIOCDetail={() => {
                 setCurrentTab('iocs');
               }}
+              onNavigateTab={(tab) => {
+                setCurrentTab(tab as any);
+              }}
             />
           )}
 

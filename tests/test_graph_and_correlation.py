@@ -308,3 +308,78 @@ async def test_relationship_rbac_and_deletion(client: AsyncClient, admin_token: 
     # Query neighborhood: edge should no longer appear as active
     neigh = await client.get(f"/api/v1/graph/iocs/{id1}/neighborhood?depth=1", headers=admin_headers)
     assert len(neigh.json()["edges"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_graph_entity_resolution(client: AsyncClient, admin_token: str):
+    """Verifies that GraphService resolves Threat Actors and Malware with real names and attributes."""
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # 1. Create Threat Actor
+    actor_resp = await client.post(
+        "/api/v1/entities/actors",
+        json={
+            "name": "Lazarus Subgroup 99",
+            "aliases": ["Hidden Cobra 99"],
+            "primary_motivation": "financial-gain",
+            "sophistication": "advanced",
+            "origin_country": "KP",
+            "confidence": 92.0,
+        },
+        headers=admin_headers,
+    )
+    assert actor_resp.status_code == 201
+    actor_id = actor_resp.json()["id"]
+
+    # 2. Create Malware Family
+    malware_resp = await client.post(
+        "/api/v1/entities/malware",
+        json={
+            "name": "GhostWiper99",
+            "aliases": ["Wiper99"],
+            "malware_types": ["wiper"],
+            "target_platforms": ["windows"],
+            "confidence": 88.0,
+        },
+        headers=admin_headers,
+    )
+    assert malware_resp.status_code == 201
+    malware_id = malware_resp.json()["id"]
+
+    # 3. Connect Threat Actor -> Malware via relationship
+    rel_resp = await client.post(
+        "/api/v1/graph/relationships",
+        json={
+            "source_id": actor_id,
+            "target_id": malware_id,
+            "relationship_type": RelationshipType.USES.value,
+            "rationale": "Adversary observed deploying GhostWiper99 in destructive campaign",
+            "source_name": "CTI Analyst Team",
+            "confidence": 90.0,
+        },
+        headers=admin_headers,
+    )
+    assert rel_resp.status_code == 201
+
+    # 4. Query neighborhood starting from Threat Actor
+    neigh_resp = await client.get(f"/api/v1/graph/iocs/{actor_id}/neighborhood?depth=1", headers=admin_headers)
+    assert neigh_resp.status_code == 200
+    neigh_data = neigh_resp.json()
+
+    # Verify nodes
+    node_map = {n["id"]: n for n in neigh_data["nodes"]}
+    assert actor_id in node_map
+    assert malware_id in node_map
+
+    actor_node = node_map[actor_id]
+    assert actor_node["label"] == "Lazarus Subgroup 99"
+    assert actor_node["entity_type"] == "threat-actor"
+    assert actor_node["risk_score"] == 92.0
+    assert actor_node["attributes"]["primary_motivation"] == "financial-gain"
+    assert actor_node["attributes"]["origin_country"] == "KP"
+
+    malware_node = node_map[malware_id]
+    assert malware_node["label"] == "GhostWiper99"
+    assert malware_node["entity_type"] == "malware"
+    assert "windows" in malware_node["attributes"]["target_platforms"]
+

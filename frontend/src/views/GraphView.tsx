@@ -17,6 +17,12 @@ import {
   Sliders,
   CheckCircle2,
   Trash2,
+  Users,
+  Bug,
+  Layers,
+  Flame,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { api } from '../services/api';
 import type {
@@ -24,14 +30,15 @@ import type {
   GraphNode,
   GraphEdge,
 } from '../types';
-import { RiskScore, StatusBadge, Badge } from '../components/ui';
+import { StatusBadge, Badge } from '../components/ui';
 
 interface GraphViewProps {
   initialSeedId?: string;
   onOpenIOCDetail?: (iocId: string) => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
-export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDetail }) => {
+export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDetail, onNavigateTab }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
 
@@ -52,6 +59,13 @@ export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDe
   // Inspector State
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<GraphEdge | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyId = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
 
   // Search autocomplete candidates
   const [searchCandidates, setSearchCandidates] = useState<{ id: string; value: string; type: string }[]>([]);
@@ -60,13 +74,29 @@ export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDe
   useEffect(() => {
     const loadInitialSeed = async () => {
       try {
-        const res = await api.listIOCs({ page: 1, page_size: 15 });
-        if (res.items.length > 0) {
-          setSearchCandidates(
-            res.items.map((i) => ({ id: i.id, value: i.normalized_value, type: i.ioc_type }))
+        const [iocRes, actorRes] = await Promise.allSettled([
+          api.listIOCs({ page: 1, page_size: 15 }),
+          api.listThreatActors({ page: 1, page_size: 10 }),
+        ]);
+
+        const candidates: { id: string; value: string; type: string }[] = [];
+
+        if (iocRes.status === 'fulfilled' && iocRes.value?.items?.length > 0) {
+          candidates.push(
+            ...iocRes.value.items.map((i: any) => ({ id: i.id, value: i.normalized_value, type: i.ioc_type }))
           );
+        }
+
+        if (actorRes.status === 'fulfilled' && actorRes.value?.items?.length > 0) {
+          candidates.push(
+            ...actorRes.value.items.map((a: any) => ({ id: a.id, value: a.name, type: 'threat-actor' }))
+          );
+        }
+
+        if (candidates.length > 0) {
+          setSearchCandidates(candidates);
           if (!seedInput && !initialSeedId) {
-            setSeedInput(res.items[0].id);
+            setSeedInput(candidates[0].id);
           }
         }
       } catch (err) {
@@ -137,16 +167,31 @@ export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDe
         }
 
         let shape: cytoscape.Css.NodeShape = 'ellipse';
-        if (n.ioc_type === 'ipv4' || n.ioc_type === 'ipv6') shape = 'round-rectangle';
+        if (n.entity_type === 'threat-actor' || n.ioc_type === 'threat-actor') shape = 'hexagon';
+        else if (n.entity_type === 'malware' || n.ioc_type === 'malware') shape = 'diamond';
+        else if (n.entity_type === 'attack-technique' || n.ioc_type === 'technique') shape = 'round-rectangle';
+        else if (n.entity_type === 'vulnerability' || n.ioc_type === 'vulnerability') shape = 'triangle';
+        else if (n.ioc_type === 'ipv4' || n.ioc_type === 'ipv6') shape = 'round-rectangle';
         else if (n.ioc_type === 'domain' || n.ioc_type === 'fqdn') shape = 'diamond';
         else if (n.ioc_type === 'url') shape = 'hexagon';
         else if (n.ioc_type?.startsWith('hash_')) shape = 'ellipse';
+
+        const isActorOrMalware = n.entity_type === 'threat-actor' || n.entity_type === 'malware';
+        const nodeWidth = n.id === seedInput ? (isActorOrMalware ? 52 : 44) : (isActorOrMalware ? 42 : 36);
+        const nodeHeight = n.id === seedInput ? (isActorOrMalware ? 52 : 44) : (isActorOrMalware ? 42 : 36);
+
+        let displayLabel = n.label;
+        if (n.entity_type === 'attack-technique' && displayLabel.length > 28) {
+          displayLabel = displayLabel.slice(0, 26) + '…';
+        } else if (displayLabel.length > 24) {
+          displayLabel = displayLabel.slice(0, 22) + '…';
+        }
 
         return {
           group: 'nodes' as const,
           data: {
             id: n.id,
-            label: n.label.length > 24 ? n.label.slice(0, 22) + '…' : n.label,
+            label: displayLabel,
             full_label: n.label,
             risk_score: n.risk_score,
             ioc_type: n.ioc_type || n.entity_type,
@@ -158,8 +203,8 @@ export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDe
             'border-width': n.id === seedInput ? 3 : 1.5,
             'border-opacity': 0.9,
             shape: shape,
-            width: n.id === seedInput ? 44 : 36,
-            height: n.id === seedInput ? 44 : 36,
+            width: nodeWidth,
+            height: nodeHeight,
             color: '#f8fafc',
             'font-family': 'ui-monospace, monospace',
             'font-size': '10px',
@@ -546,98 +591,454 @@ export const GraphView: React.FC<GraphViewProps> = ({ initialSeedId, onOpenIOCDe
         </div>
 
         {/* Right Inspector Drawer (Collapsible) */}
-        <div className="w-80 border-l border-poseidon-border bg-poseidon-surface/95 backdrop-blur flex flex-col shrink-0 overflow-y-auto scrollbar-thin">
-          {selectedNode ? (
-            /* Node Details Panel */
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-poseidon-border">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-poseidon-cyan" />
-                  <span className="text-xs font-mono font-semibold text-white uppercase">
-                    Node Inspector
-                  </span>
-                </div>
-                <Badge variant="cyan">{selectedNode.ioc_type || selectedNode.entity_type}</Badge>
-              </div>
+        <div className="w-88 xl:w-96 border-l border-poseidon-border bg-poseidon-surface/95 backdrop-blur flex flex-col shrink-0 overflow-y-auto scrollbar-thin">
+          {selectedNode ? (() => {
+            const isActor = selectedNode.entity_type === 'threat-actor' || selectedNode.ioc_type === 'threat-actor';
+            const isMalware = selectedNode.entity_type === 'malware' || selectedNode.ioc_type === 'malware';
+            const isTechnique = selectedNode.entity_type === 'attack-technique' || selectedNode.ioc_type === 'technique';
+            const isVuln = selectedNode.entity_type === 'vulnerability' || selectedNode.ioc_type === 'vulnerability';
+            const isIOC = selectedNode.entity_type === 'ioc';
 
-              <div>
-                <div className="text-[10px] font-mono text-slate-500 uppercase">Observable Value</div>
-                <div className="text-xs font-mono text-white break-all select-all font-semibold bg-poseidon-base/60 p-2 rounded border border-poseidon-border mt-1">
-                  {selectedNode.label}
-                </div>
-              </div>
-
-              {/* Risk & Confidence */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-2.5 rounded bg-poseidon-elevated border border-poseidon-border">
-                  <span className="text-[10px] font-mono text-slate-400 block mb-1">RISK SCORE</span>
-                  <RiskScore score={selectedNode.risk_score} showDetails={false} />
-                </div>
-                <div className="p-2.5 rounded bg-poseidon-elevated border border-poseidon-border">
-                  <span className="text-[10px] font-mono text-slate-400 block mb-1">CONFIDENCE</span>
-                  <span className="text-sm font-mono font-bold text-poseidon-cyan">
-                    {Math.round(selectedNode.confidence_score)}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Attributes */}
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono">
-                  <span className="text-slate-500">Status</span>
-                  <StatusBadge status={selectedNode.status as any} />
-                </div>
-                <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono">
-                  <span className="text-slate-500">TLP Level</span>
-                  <span className="font-semibold text-poseidon-amber">{selectedNode.tlp}</span>
-                </div>
-                {selectedNode.attributes?.sightings_count && (
-                  <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono">
-                    <span className="text-slate-500">Sightings</span>
-                    <span className="text-white font-semibold">{selectedNode.attributes.sightings_count}</span>
+            return (
+              <div className="p-4 space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-poseidon-border">
+                  <div className="flex items-center gap-2">
+                    {isActor ? (
+                      <Users className="w-4 h-4 text-purple-400" />
+                    ) : isMalware ? (
+                      <Bug className="w-4 h-4 text-rose-400" />
+                    ) : isTechnique ? (
+                      <Layers className="w-4 h-4 text-amber-400" />
+                    ) : isVuln ? (
+                      <Flame className="w-4 h-4 text-orange-400" />
+                    ) : (
+                      <ShieldAlert className="w-4 h-4 text-poseidon-cyan" />
+                    )}
+                    <span className="text-xs font-mono font-semibold text-white uppercase tracking-wider">
+                      {isActor
+                        ? 'Threat Actor'
+                        : isMalware
+                        ? 'Malware Family'
+                        : isTechnique
+                        ? 'MITRE ATT&CK'
+                        : isVuln
+                        ? 'Vulnerability'
+                        : 'Node Inspector'}
+                    </span>
                   </div>
-                )}
-              </div>
-
-              {/* Tags */}
-              {selectedNode.tags && selectedNode.tags.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-mono text-slate-500 uppercase mb-1.5">Tags & Signatures</div>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedNode.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-poseidon-elevated border border-poseidon-border text-slate-300"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="pt-2 space-y-2">
-                <button
-                  onClick={() => setSeedInput(selectedNode.id)}
-                  className="w-full py-1.5 bg-poseidon-cyan/15 hover:bg-poseidon-cyan/25 text-poseidon-cyan border border-poseidon-cyan/30 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Network className="w-3.5 h-3.5" />
-                  <span>Re-Center Graph Here</span>
-                </button>
-
-                {onOpenIOCDetail && (
-                  <button
-                    onClick={() => onOpenIOCDetail(selectedNode.id)}
-                    className="w-full py-1.5 bg-poseidon-elevated hover:bg-slate-700/60 text-slate-200 border border-poseidon-border rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                  <Badge
+                    variant={
+                      isActor
+                        ? 'purple'
+                        : isMalware
+                        ? 'critical'
+                        : isTechnique
+                        ? 'gold'
+                        : isVuln
+                        ? 'high'
+                        : 'cyan'
+                    }
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Open Intelligence Card</span>
-                  </button>
+                    {selectedNode.ioc_type || selectedNode.entity_type}
+                  </Badge>
+                </div>
+
+                {/* Primary Identifier Box */}
+                <div>
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                    {isActor
+                      ? 'Adversary Identity'
+                      : isMalware
+                      ? 'Malware Identifier'
+                      : isTechnique
+                      ? 'ATT&CK Technique'
+                      : isVuln
+                      ? 'Vulnerability Identifier'
+                      : 'Observable Value'}
+                  </div>
+                  <div className="bg-poseidon-base/80 p-2.5 rounded-lg border border-poseidon-border mt-1">
+                    <div className="text-sm font-mono text-white font-bold break-all select-all flex items-center justify-between gap-2">
+                      <span className="truncate">{selectedNode.label}</span>
+                      <button
+                        onClick={() => handleCopyId(selectedNode.label)}
+                        title="Copy name"
+                        className="p-1 text-slate-400 hover:text-white rounded hover:bg-poseidon-elevated shrink-0 transition-colors"
+                      >
+                        {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    {selectedNode.id !== selectedNode.label && (
+                      <div className="mt-1 pt-1 border-t border-poseidon-border/40 flex items-center justify-between text-[10px] font-mono text-slate-500">
+                        <span className="truncate">ID: {selectedNode.id}</span>
+                        <button
+                          onClick={() => handleCopyId(selectedNode.id)}
+                          className="hover:text-slate-300 ml-1 shrink-0"
+                          title="Copy UUID"
+                        >
+                          copy
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Risk & Confidence KPI Cards */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Risk Score Card */}
+                  <div className="p-3 rounded-lg bg-poseidon-elevated/70 border border-poseidon-border font-mono flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider">RISK SCORE</span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                          selectedNode.risk_score >= 70
+                            ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            : selectedNode.risk_score >= 40
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        }`}
+                      >
+                        {selectedNode.risk_score >= 75
+                          ? 'CRITICAL'
+                          : selectedNode.risk_score >= 50
+                          ? 'HIGH'
+                          : selectedNode.risk_score >= 25
+                          ? 'MEDIUM'
+                          : 'LOW'}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1 my-1">
+                      <span
+                        className={`text-2xl font-black ${
+                          selectedNode.risk_score >= 70
+                            ? 'text-rose-400'
+                            : selectedNode.risk_score >= 40
+                            ? 'text-amber-400'
+                            : 'text-emerald-400'
+                        }`}
+                      >
+                        {Math.round(selectedNode.risk_score)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">/ 100</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-poseidon-base rounded-full overflow-hidden mt-1 border border-poseidon-border/40">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          selectedNode.risk_score >= 70
+                            ? 'bg-rose-500'
+                            : selectedNode.risk_score >= 40
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, selectedNode.risk_score))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Confidence Card */}
+                  <div className="p-3 rounded-lg bg-poseidon-elevated/70 border border-poseidon-border font-mono flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider">CONFIDENCE</span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                          selectedNode.confidence_score >= 80
+                            ? 'bg-poseidon-cyan/15 text-poseidon-cyan border-poseidon-cyan/30'
+                            : selectedNode.confidence_score >= 50
+                            ? 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+                            : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                        }`}
+                      >
+                        {selectedNode.confidence_score >= 80
+                          ? 'HIGH'
+                          : selectedNode.confidence_score >= 50
+                          ? 'VERIFIED'
+                          : 'PROVISIONAL'}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1 my-1">
+                      <span className="text-2xl font-black text-poseidon-cyan">
+                        {Math.round(selectedNode.confidence_score)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-poseidon-base rounded-full overflow-hidden mt-1 border border-poseidon-border/40">
+                      <div
+                        className="h-full bg-poseidon-cyan transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(0, selectedNode.confidence_score))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contextual Entity Details */}
+                {isActor && selectedNode.attributes && (
+                  <div className="p-3 rounded-lg bg-poseidon-elevated/40 border border-purple-500/20 space-y-2.5 text-xs font-mono">
+                    <div className="text-[10px] text-purple-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Adversary Profile</span>
+                    </div>
+                    {selectedNode.attributes.aliases && selectedNode.attributes.aliases.length > 0 && (
+                      <div>
+                        <span className="text-slate-500 text-[10px] block mb-1">ALIASES / CODE NAMES:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedNode.attributes.aliases.map((alias: string) => (
+                            <span
+                              key={alias}
+                              className="px-1.5 py-0.5 text-[10px] rounded bg-purple-500/15 border border-purple-500/30 text-purple-200"
+                            >
+                              {alias}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-poseidon-border/50 text-[11px]">
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">MOTIVATION:</span>
+                        <span className="text-slate-200 capitalize">{selectedNode.attributes.primary_motivation || 'Unknown'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">ORIGIN COUNTRY:</span>
+                        <span className="text-slate-200">{selectedNode.attributes.origin_country || 'Undetermined'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">SOPHISTICATION:</span>
+                        <span className="text-slate-200 capitalize">{selectedNode.attributes.sophistication || 'Advanced'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">RESOURCE LEVEL:</span>
+                        <span className="text-slate-200 capitalize">{selectedNode.attributes.resource_level || 'Organization'}</span>
+                      </div>
+                    </div>
+                    {selectedNode.attributes.description && (
+                      <div className="pt-1.5 border-t border-poseidon-border/40 text-[11px] text-slate-300 leading-relaxed max-h-24 overflow-y-auto">
+                        {selectedNode.attributes.description}
+                      </div>
+                    )}
+                  </div>
                 )}
+
+                {isMalware && selectedNode.attributes && (
+                  <div className="p-3 rounded-lg bg-poseidon-elevated/40 border border-rose-500/20 space-y-2.5 text-xs font-mono">
+                    <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Bug className="w-3.5 h-3.5" />
+                      <span>Malware Telemetry</span>
+                    </div>
+                    {selectedNode.attributes.aliases && selectedNode.attributes.aliases.length > 0 && (
+                      <div>
+                        <span className="text-slate-500 text-[10px] block mb-1">VARIANTS & ALIASES:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedNode.attributes.aliases.map((alias: string) => (
+                            <span
+                              key={alias}
+                              className="px-1.5 py-0.5 text-[10px] rounded bg-rose-500/15 border border-rose-500/30 text-rose-200"
+                            >
+                              {alias}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedNode.attributes.target_platforms && selectedNode.attributes.target_platforms.length > 0 && (
+                      <div>
+                        <span className="text-slate-500 text-[10px] block mb-1">TARGET PLATFORMS:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedNode.attributes.target_platforms.map((p: string) => (
+                            <span
+                              key={p}
+                              className="px-1.5 py-0.5 text-[10px] rounded bg-poseidon-elevated border border-poseidon-border text-slate-300 capitalize"
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedNode.attributes.description && (
+                      <div className="pt-1.5 border-t border-poseidon-border/40 text-[11px] text-slate-300 leading-relaxed max-h-24 overflow-y-auto">
+                        {selectedNode.attributes.description}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isTechnique && selectedNode.attributes && (
+                  <div className="p-3 rounded-lg bg-poseidon-elevated/40 border border-amber-500/20 space-y-2.5 text-xs font-mono">
+                    <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>ATT&CK Framework Alignment</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">TACTIC ID:</span>
+                        <span className="text-poseidon-gold font-semibold">{selectedNode.attributes.tactic_id}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">SUB-TECHNIQUE:</span>
+                        <span className="text-slate-200">{selectedNode.attributes.is_subtechnique ? 'Yes' : 'No'}</span>
+                      </div>
+                    </div>
+                    {selectedNode.attributes.platforms && (
+                      <div>
+                        <span className="text-slate-500 text-[10px] block mb-1">PLATFORMS:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedNode.attributes.platforms.map((p: string) => (
+                            <span
+                              key={p}
+                              className="px-1.5 py-0.5 text-[10px] rounded bg-poseidon-elevated border border-poseidon-border text-slate-300"
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedNode.attributes.mitre_url && (
+                      <a
+                        href={selectedNode.attributes.mitre_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[10px] text-poseidon-cyan hover:underline pt-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>View on attack.mitre.org</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {isVuln && selectedNode.attributes && (
+                  <div className="p-3 rounded-lg bg-poseidon-elevated/40 border border-orange-500/20 space-y-2 text-xs font-mono">
+                    <div className="text-[10px] text-orange-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5" />
+                      <span>CVE Vulnerability Assessment</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">CVSS v3 SCORE:</span>
+                        <span className="text-orange-300 font-bold">{selectedNode.attributes.cvss_score || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">CISA KEV STATUS:</span>
+                        <span className={selectedNode.attributes.is_cisa_kev ? 'text-rose-400 font-bold' : 'text-slate-400'}>
+                          {selectedNode.attributes.is_cisa_kev ? 'EXPLOITED IN WILD' : 'No Known Wild Exploits'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* General Metadata */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono">
+                    <span className="text-slate-500">Lifecycle Status</span>
+                    <StatusBadge status={selectedNode.status as any} />
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono">
+                    <span className="text-slate-500">TLP Classification</span>
+                    <span
+                      className={`font-semibold px-2 py-0.5 rounded text-[10px] border ${
+                        selectedNode.tlp === 'RED'
+                          ? 'text-red-400 border-red-500/30 bg-red-500/10'
+                          : selectedNode.tlp === 'AMBER'
+                          ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+                          : selectedNode.tlp === 'GREEN'
+                          ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                          : 'text-slate-300 border-slate-500/30 bg-slate-500/10'
+                      }`}
+                    >
+                      TLP:{selectedNode.tlp}
+                    </span>
+                  </div>
+                  {selectedNode.attributes?.sightings_count !== undefined && (
+                    <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono">
+                      <span className="text-slate-500">Sightings Count</span>
+                      <span className="text-white font-semibold">{selectedNode.attributes.sightings_count}</span>
+                    </div>
+                  )}
+                  {selectedNode.attributes?.first_seen && (
+                    <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono text-[11px]">
+                      <span className="text-slate-500">First Observed</span>
+                      <span className="text-slate-300">{new Date(selectedNode.attributes.first_seen).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {selectedNode.attributes?.last_seen && (
+                    <div className="flex justify-between py-1 border-b border-poseidon-border/50 font-mono text-[11px]">
+                      <span className="text-slate-500">Last Telemetry</span>
+                      <span className="text-slate-300">{new Date(selectedNode.attributes.last_seen).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tags */}
+                {selectedNode.tags && selectedNode.tags.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Tags & Signatures</div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedNode.tags.map((t) => (
+                        <span
+                          key={t}
+                          className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-poseidon-elevated border border-poseidon-border text-slate-300"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="pt-2 space-y-2">
+                  <button
+                    onClick={() => setSeedInput(selectedNode.id)}
+                    className="w-full py-1.5 bg-poseidon-cyan/15 hover:bg-poseidon-cyan/25 text-poseidon-cyan border border-poseidon-cyan/30 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <Network className="w-3.5 h-3.5" />
+                    <span>Re-Center Graph on {selectedNode.label.length > 18 ? selectedNode.label.slice(0, 16) + '…' : selectedNode.label}</span>
+                  </button>
+
+                  {isIOC && onOpenIOCDetail && (
+                    <button
+                      onClick={() => onOpenIOCDetail(selectedNode.id)}
+                      className="w-full py-1.5 bg-poseidon-elevated hover:bg-slate-700/60 text-slate-200 border border-poseidon-border rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open Intelligence Card</span>
+                    </button>
+                  )}
+
+                  {isActor && onNavigateTab && (
+                    <button
+                      onClick={() => onNavigateTab('actors')}
+                      className="w-full py-1.5 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>View Threat Actor Catalog</span>
+                    </button>
+                  )}
+
+                  {isMalware && onNavigateTab && (
+                    <button
+                      onClick={() => onNavigateTab('malware')}
+                      className="w-full py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Bug className="w-3.5 h-3.5" />
+                      <span>View Malware Catalog</span>
+                    </button>
+                  )}
+
+                  {isTechnique && onNavigateTab && (
+                    <button
+                      onClick={() => onNavigateTab('mitre')}
+                      className="w-full py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Open ATT&CK Matrix Navigator</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : selectedEdge ? (
+            );
+          })() : selectedEdge ? (
             /* Edge "Why are they related?" Panel */
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-poseidon-border">

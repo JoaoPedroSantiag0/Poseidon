@@ -62,14 +62,14 @@ export const RiskScore: React.FC<RiskScoreProps> = ({
   ];
 
   return (
-    <div className="bg-poseidon-surface border border-poseidon-border rounded-xl p-4 space-y-3 font-mono">
+    <div className="bg-poseidon-surface border border-poseidon-border rounded-xl p-4 space-y-3 font-mono min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertCircle className={`w-4 h-4 ${tierColor}`} />
-          <span className="text-xs font-semibold text-slate-300">POSEIDON RISK SCORE</span>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <AlertCircle className={`w-4 h-4 ${tierColor} shrink-0`} />
+          <span className="text-xs font-semibold text-slate-300 truncate">POSEIDON RISK SCORE</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badgeBg} ${tierColor}`}>
             {tierLabel}
           </span>
